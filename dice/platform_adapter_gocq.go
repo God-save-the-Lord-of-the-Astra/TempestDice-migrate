@@ -106,6 +106,25 @@ type Sender struct {
 	UserID   json.RawMessage `json:"user_id"`
 }
 
+type OnebotGroupInfo struct {
+	GroupID         int64  `json:"group_id"`          // 群号
+	GroupName       string `json:"group_name"`        // 群名称
+	GroupMemo       string `json:"group_memo"`        // 群备注
+	GroupCreateTime uint32 `json:"group_create_time"` // 群创建时间
+	GroupLevel      uint32 `json:"group_level"`       // 群等级
+	MemberCount     int32  `json:"member_count"`      // 成员数
+	MaxMemberCount  int32  `json:"max_member_count"`  // 最大成员数（群容量）
+}
+
+type OnebotGroupListItem struct {
+	GroupID   int64  `json:"group_id"`   // 群号
+	GroupName string `json:"group_name"` // 群名称
+}
+
+type OnebotGroupList struct {
+	List []OnebotGroupListItem
+}
+
 type OnebotUserInfo struct {
 	// 个人信息
 	Nickname string `json:"nickname"`
@@ -118,6 +137,15 @@ type OnebotUserInfo struct {
 	GroupName       string `json:"group_name"`
 	MaxMemberCount  int32  `json:"max_member_count"`
 	Card            string `json:"card"`
+}
+
+type OnebotUserListItem struct {
+	Nickname string `json:"nickname"`
+	UserID   string `json:"user_id"`
+}
+
+type OnebotUserList struct {
+	List []OnebotUserListItem
 }
 
 type MessageQQBase struct {

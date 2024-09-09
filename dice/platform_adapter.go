@@ -37,6 +37,7 @@ type PlatformAdapter interface {
 	SendLike(ctx *MsgContext, userID string, times int)
 	SetGroupAdmin(ctx *MsgContext, groupID string, userID string, enable bool)
 	SetGroupName(ctx *MsgContext, groupID string, groupName string)
+	SetGroupSpecialTitle(ctx *MsgContext, groupID string, userID string, specialTitle string)
 	SetSelfLongNick(ctx *MsgContext, longNick string)
 	SharePeer(ctx *MsgContext, groupID string, userID string) //暂时不能用
 	ShareGroup(ctx *MsgContext, groupID string)               //暂时不能用

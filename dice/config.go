@@ -2237,7 +2237,7 @@ func (d *Dice) loads() {
 			d.GroupBurst = 3
 		}
 
-		if d.DiceMasters == nil || len(d.DiceMasters) == 0 {
+		if len(d.DiceMasters) == 0 {
 			d.DiceMasters = []string{"UI:1001"}
 		}
 		var newDiceMasters []string
@@ -2309,140 +2309,6 @@ func (d *Dice) loads() {
 			}
 			return true
 		})
-
-		if d.VersionCode != 0 && d.VersionCode < 10000 {
-			d.CustomReplyConfigEnable = false
-		}
-
-		if d.VersionCode != 0 && d.VersionCode < 10001 {
-			d.AliveNoticeValue = "@every 3h"
-		}
-
-		if d.VersionCode != 0 && d.VersionCode < 10003 {
-			d.Logger.Infof("进行配置文件版本升级: %d -> %d", d.VersionCode, 10003)
-			d.LogSizeNoticeCount = 500
-			d.LogSizeNoticeEnable = true
-			d.CustomReplyConfigEnable = true
-		}
-
-		if d.VersionCode != 0 && d.VersionCode < 10005 {
-			d.RunAfterLoaded = append(d.RunAfterLoaded, func() {
-				d.Logger.Info("正在自动升级自定义文案文件")
-				for index, text := range d.TextMapRaw["核心"]["昵称_重置"] {
-					srcText := text[0].(string)
-					srcText = strings.ReplaceAll(srcText, "{$tQQ昵称}", "{$t旧昵称}")
-					srcText = strings.ReplaceAll(srcText, "{$t帐号昵称}", "{$t旧昵称}")
-					d.TextMapRaw["核心"]["昵称_重置"][index][0] = srcText
-				}
-
-				for index, text := range d.TextMapRaw["核心"]["角色管理_删除成功"] {
-					srcText := text[0].(string)
-					srcText = strings.ReplaceAll(srcText, "{$t新角色名}", "{$t角色名}")
-					d.TextMapRaw["核心"]["角色管理_删除成功"][index][0] = srcText
-				}
-
-				SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
-				d.GenerateTextMap()
-				d.SaveText()
-			})
-		}
-
-		// 1.2 版本
-		if d.VersionCode != 0 && d.VersionCode < 10200 {
-			d.TextCmdTrustOnly = true
-			d.QQEnablePoke = true
-			d.PlayerNameWrapEnable = true
-
-			isUI1001Master := false
-			for _, i := range d.DiceMasters {
-				if i == "UI:1001" {
-					isUI1001Master = true
-					break
-				}
-			}
-			if !isUI1001Master {
-				d.DiceMasters = append(d.DiceMasters, "UI:1001")
-			}
-
-			d.RunAfterLoaded = append(d.RunAfterLoaded, func() {
-				// 更正写反的部分
-				d.Logger.Info("正在自动升级自定义文案文件")
-				for index := range d.TextMapRaw["COC"]["属性设置_保存提醒"] {
-					srcText := `{ $t当前绑定角色 ? '[√] 已绑卡' : '' }`
-					d.TextMapRaw["COC"]["属性设置_保存提醒"][index][0] = srcText
-				}
-
-				SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
-				d.GenerateTextMap()
-				d.SaveText()
-			})
-		}
-
-		// 1.2 版本
-		if d.VersionCode != 0 && d.VersionCode < 10203 {
-			d.RunAfterLoaded = append(d.RunAfterLoaded, func() {
-				// 更正写反的部分
-				d.Logger.Info("正在自动升级自定义文案文件")
-				for index := range d.TextMapRaw["COC"]["属性设置_增减_单项"] {
-					srcText := "{$t属性}: {$t旧值} ➯ {$t新值} ({$t增加或扣除}{$t表达式文本}={$t变化量})"
-					d.TextMapRaw["COC"]["属性设置_增减_单项"][index][0] = srcText
-				}
-
-				SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
-				d.GenerateTextMap()
-				d.SaveText()
-			})
-		}
-
-		// 1.3 版本
-		if d.VersionCode != 0 && d.VersionCode < 10300 {
-			d.JsEnable = true
-
-			d.RunAfterLoaded = append(d.RunAfterLoaded, func() {
-				// 更正写反的部分
-				d.Logger.Info("正在自动升级自定义文案文件")
-				for index, text := range d.TextMapRaw["娱乐"]["鸽子理由"] {
-					srcText := text[0].(string)
-					srcText = strings.ReplaceAll(srcText, "在互联网上约到可爱美少女不惜搁置跑团前去约会的{$t玩家}，还不知道这个叫奈亚的妹子隐藏着什么", "空山不见人，但闻咕咕声。 —— {$t玩家}")
-					d.TextMapRaw["娱乐"]["鸽子理由"][index][0] = srcText
-				}
-
-				SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
-				d.GenerateTextMap()
-				d.SaveText()
-			})
-		}
-
-		// 1.4.3 版本 - 这个migrate应当持续运行几个版本，因为随时可能导入旧文案，而不是升级到143就结束
-		d.RunAfterLoaded = append(d.RunAfterLoaded, func() {
-			d.Logger.Info("正在自动升级自定义文案文件")
-			for index, text := range d.TextMapRaw["COC"]["对抗检定"] {
-				srcText := text[0].(string)
-				srcText = strings.ReplaceAll(srcText, "{$t玩家A判定值}", "{$t玩家A出目}")
-				srcText = strings.ReplaceAll(srcText, "{$t玩家B判定值}", "{$t玩家B出目}")
-				d.TextMapRaw["COC"]["对抗检定"][index][0] = srcText
-			}
-			SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
-			d.GenerateTextMap()
-			d.SaveText()
-		})
-
-		// 1.4.5 版本 - 覆写lagrange配置
-		for _, i := range d.ImSession.EndPoints {
-			if i.ProtocolType == "onebot" {
-				pa := i.Adapter.(*PlatformAdapterGocq)
-				if pa.BuiltinMode == "lagrange" {
-					signServerUrl, signServerVersion := RWLagrangeSignServerUrl(d, i, "sealdice", false, "25765")
-					if signServerUrl != "" {
-						// 版本为空，覆写为 "25765"
-						if signServerVersion == "" {
-							RWLagrangeSignServerUrl(d, i, "sealdice", true, "25765")
-						}
-					}
-				}
-			}
-		}
-
 		// 设置全局群名缓存和用户名缓存
 		dm := d.Parent
 		now := time.Now().Unix()

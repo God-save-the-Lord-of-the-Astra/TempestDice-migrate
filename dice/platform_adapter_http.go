@@ -105,6 +105,8 @@ func (pa *PlatformAdapterHTTP) SetGroupAdmin(_ *MsgContext, _ string, _ string, 
 
 func (pa *PlatformAdapterHTTP) SetGroupName(_ *MsgContext, _ string, _ string) {}
 
+func (pa *PlatformAdapterHTTP) SetGroupSpecialTitle(_ *MsgContext, _ string, _ string, _ string) {}
+
 func (pa *PlatformAdapterHTTP) SetSelfLongNick(_ *MsgContext, _ string) {}
 
 func (pa *PlatformAdapterHTTP) SharePeer(_ *MsgContext, _ string, _ string) {}

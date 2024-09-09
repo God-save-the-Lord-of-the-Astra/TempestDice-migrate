@@ -136,6 +136,7 @@ func cleanupCreate(diceManager *dice.DiceManager) func() {
 	}
 }
 
+/*
 func fixTimezone() {
 	out, err := exec.Command("/system/bin/getprop", "persist.sys.timezone").Output()
 	if err != nil {
@@ -147,6 +148,7 @@ func fixTimezone() {
 	}
 	time.Local = z
 }
+*/
 
 func main() {
 	initStartTime := time.Now().UnixMicro()
@@ -227,17 +229,7 @@ func main() {
 		return
 	}
 
-	useBuiltinUI := false
-	checkFrontendExists := func() bool {
-		stat, err := os.Stat("./frontend_overwrite")
-		return err == nil && stat.IsDir()
-	}
-	if !checkFrontendExists() {
-		logger.Info("未检测到外置的UI资源文件，将使用内置资源启动UI")
-		useBuiltinUI = true
-	} else {
-		logger.Info("检测到外置的UI资源文件，将使用frontend_overwrite文件夹内的资源启动UI")
-	}
+	useBuiltinUI := true
 
 	// 删除遗留的shm和wal文件
 	if !model.DBCacheDelete() {
@@ -315,7 +307,7 @@ func main() {
 		w.Run()
 	}()*/
 	initEndTime := time.Now().UnixMicro()
-	fmt.Println(fmt.Sprintf("%s%d%s", "初始化完成，耗时: ", int((initEndTime-initStartTime)/1000), "毫秒"))
+	fmt.Printf("%s%d%s", "初始化完成，耗时: ", int((initEndTime-initStartTime)/1000), "毫秒\n")
 	// OOM分析工具
 	// err = nil
 	// err = http.ListenAndServe(":9090", nil)

@@ -13,6 +13,8 @@ import (
 )
 
 func (d *Dice) RegisterBuiltinExt() {
+	d.registerExtLoader()
+	RegisterBuiltinCoreCommands(d)
 	RegisterBuiltinExtCoc7(d)
 	RegisterBuiltinExtLog(d)
 	RegisterBuiltinExtFun(d)
@@ -21,8 +23,10 @@ func (d *Dice) RegisterBuiltinExt() {
 	RegisterBuiltinExtDnd5e(d)
 	RegisterBuiltinStory(d)
 	RegisterBuiltinExtExp(d)
-	RegisterExecCodeCommands(d)
-	RegisterGuiMiCommands(d)
+
+	RegisterBuiltinSealdiceCommands(d)
+	RegisterBuiltinMdiceCommands(d)
+	RegisterBuiltinShikiCommands(d)
 
 	d.RegisterBuiltinSystemTemplate()
 }

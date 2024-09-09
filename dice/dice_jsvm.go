@@ -492,12 +492,12 @@ func (d *Dice) JsInit() {
 		_ = seal.Set("SendLike", SendLike)
 		_ = seal.Set("SetGroupAdmin", SetGroupAdmin)
 		_ = seal.Set("SetGroupName", SetGroupName)
+		_ = seal.Set("SetGroupSpecialTitle", SetGroupSpecialTitle)
 		_ = seal.Set("SetSelfLongNick", SetSelfLongNick)
 		_ = seal.Set("format", DiceFormat)
 		_ = seal.Set("formatTmpl", DiceFormatTmpl)
 		_ = seal.Set("getCtxProxyFirst", GetCtxProxyFirst)
 
-		// 1.2新增
 		_ = seal.Set("newMessage", func() *Message {
 			return &Message{}
 		})

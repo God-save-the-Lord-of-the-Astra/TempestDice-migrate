@@ -85,16 +85,6 @@ func (pa *PlatformAdapterGocq) GetGroupInfoAsync(groupID string) {
 	socketSendText(pa.Socket, string(a))
 }
 
-type OnebotGroupInfo struct {
-	GroupID         int64  `json:"group_id"`          // 群号
-	GroupName       string `json:"group_name"`        // 群名称
-	GroupMemo       string `json:"group_memo"`        // 群备注
-	GroupCreateTime uint32 `json:"group_create_time"` // 群创建时间
-	GroupLevel      uint32 `json:"group_level"`       // 群等级
-	MemberCount     int32  `json:"member_count"`      // 成员数
-	MaxMemberCount  int32  `json:"max_member_count"`  // 最大成员数（群容量）
-}
-
 // GetGroupInfo 获取群聊信息
 func (pa *PlatformAdapterGocq) GetGroupInfo(groupID string, noCache bool) *OnebotGroupInfo {
 	type DetailParams struct {
@@ -146,7 +136,7 @@ func socketSendText(socket *gowebsocket.Socket, s string) {
 }
 
 // 不知道为什么，使用这个时候发不出话
-func socketSendBinary(socket *gowebsocket.Socket, data []byte) { //nolint
+/*func socketSendBinary(socket *gowebsocket.Socket, data []byte) { //nolint
 	defer func() {
 		if r := recover(); r != nil { //nolint
 			// core.GetLogger().Error(r)
@@ -156,7 +146,7 @@ func socketSendBinary(socket *gowebsocket.Socket, data []byte) { //nolint
 	if socket != nil {
 		socket.SendBinary(data)
 	}
-}
+}*/
 
 func doSleepQQ(ctx *MsgContext) {
 	if ctx.Dice != nil {
@@ -807,6 +797,32 @@ func (pa *PlatformAdapterGocq) SetGroupName(_ *MsgContext, groupID string, group
 		Params: DetailParams{
 			GroupID:   GID,
 			GroupName: groupName,
+		},
+	})
+
+	socketSendText(pa.Socket, string(a))
+}
+
+func (pa *PlatformAdapterGocq) SetGroupSpecialTitle(_ *MsgContext, groupID string, userID string, specialTitle string) {
+	GID, _ := pa.mustExtractID(groupID)
+	UID, _ := pa.mustExtractID(userID)
+	type DetailParams struct {
+		GroupID      int64  `json:"group_id"`
+		UserID       int64  `json:"user_id"`
+		SpecialTitle string `json:"special_title"`
+		Duration     int64  `json:"duration"`
+	}
+
+	a, _ := json.Marshal(struct {
+		Action string       `json:"action"`
+		Params DetailParams `json:"params"`
+	}{
+		Action: "set_group_special_title",
+		Params: DetailParams{
+			GroupID:      GID,
+			UserID:       UID,
+			SpecialTitle: specialTitle,
+			Duration:     -1, // -1为永久
 		},
 	})
 

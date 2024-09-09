@@ -417,6 +417,10 @@ func SetGroupName(ctx *MsgContext, groupID string, name string) {
 	ctx.EndPoint.Adapter.SetGroupName(ctx, groupID, name)
 }
 
+func SetGroupSpecialTitle(ctx *MsgContext, groupID string, userID string, specialTitle string) {
+	ctx.EndPoint.Adapter.SetGroupSpecialTitle(ctx, groupID, userID, specialTitle)
+}
+
 func SetSelfLongNick(ctx *MsgContext, longNick string) {
 	ctx.EndPoint.Adapter.SetSelfLongNick(ctx, longNick)
 }
