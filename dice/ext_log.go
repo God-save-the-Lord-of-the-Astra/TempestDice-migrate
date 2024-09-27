@@ -16,9 +16,9 @@ import (
 	ds "github.com/sealdice/dicescript"
 	"go.uber.org/zap"
 
-	"sealdice-core/dice/model"
-	"sealdice-core/dice/storylog"
-	"sealdice-core/utils"
+	"tempestdice/dice/model"
+	"tempestdice/dice/storylog"
+	"tempestdice/utils"
 )
 
 var ErrGroupCardOverlong = errors.New("群名片长度超过限制")

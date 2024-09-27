@@ -9,7 +9,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"sealdice-core/dice"
+	"tempestdice/dice"
 )
 
 func customReplySave(c echo.Context) error {

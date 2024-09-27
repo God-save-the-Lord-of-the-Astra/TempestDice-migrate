@@ -31,8 +31,8 @@ import (
 	"gopkg.in/elazarl/goproxy.v1"
 	"gopkg.in/yaml.v3"
 
-	"sealdice-core/static"
-	"sealdice-core/utils/crypto"
+	"tempestdice/static"
+	"tempestdice/utils/crypto"
 )
 
 var (

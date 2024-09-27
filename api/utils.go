@@ -16,7 +16,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/monaco-io/request"
 
-	"sealdice-core/dice"
+	"tempestdice/dice"
 )
 
 type Response map[string]interface{}

@@ -10,7 +10,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"sealdice-core/dice"
+	"tempestdice/dice"
 )
 
 func deckList(c echo.Context) error {

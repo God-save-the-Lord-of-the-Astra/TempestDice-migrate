@@ -23,8 +23,8 @@ import (
 	"github.com/monaco-io/request"
 	"golang.org/x/sys/windows"
 
-	"sealdice-core/dice"
-	"sealdice-core/icon"
+	"tempestdice/dice"
+	"tempestdice/icon"
 )
 
 func hideWindow() {

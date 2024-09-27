@@ -12,7 +12,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 
-	"sealdice-core/dice/model"
+	"tempestdice/dice/model"
 )
 
 type UploadEnv struct {

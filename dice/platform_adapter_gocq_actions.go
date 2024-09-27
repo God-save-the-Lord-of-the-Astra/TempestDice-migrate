@@ -3,7 +3,6 @@ package dice
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math/rand"
 	"net/url"
 	"os"
@@ -14,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"sealdice-core/message"
-	"sealdice-core/utils"
+	"tempestdice/message"
+	"tempestdice/utils"
 
 	"github.com/sacOO7/gowebsocket"
 	"github.com/samber/lo"
@@ -30,10 +29,8 @@ type oneBotCommand struct {
 type QQUidType int
 
 const (
-	QQUidPerson        QQUidType = 1
-	QQUidGroup         QQUidType = 2
-	QQUidChannelPerson QQUidType = 3
-	QQUidChannelGroup  QQUidType = 4
+	QQUidPerson QQUidType = 1
+	QQUidGroup  QQUidType = 2
 )
 
 func (pa *PlatformAdapterGocq) mustExtractID(id string) (int64, QQUidType) {
@@ -52,16 +49,6 @@ func (pa *PlatformAdapterGocq) mustExtractID(id string) (int64, QQUidType) {
 	uid, _ := strconv.Atoi(id)
 	num := int64(uid)
 	return num, 0
-}
-
-func (pa *PlatformAdapterGocq) mustExtractChannelID(id string) (string, QQUidType) {
-	if strings.HasPrefix(id, "QQ-CH:") {
-		return id[len("QQ-CH:"):], QQUidChannelPerson
-	}
-	if strings.HasPrefix(id, "QQ-CH-Group:") {
-		return id[len("QQ-CH-Group:"):], QQUidChannelGroup
-	}
-	return "", 0
 }
 
 // GetGroupInfoAsync 异步获取群聊信息
@@ -207,11 +194,7 @@ func (pa *PlatformAdapterGocq) SendToGroup(ctx *MsgContext, groupID string, text
 	if groupID == "" {
 		return
 	}
-	rawID, idType := pa.mustExtractID(groupID)
-	if idType == 0 {
-		pa.SendToChannelGroup(ctx, groupID, text, flag)
-		return
-	}
+	rawID, _ := pa.mustExtractID(groupID)
 
 	groupInfo, ok := ctx.Session.ServiceAtNew.Load(groupID)
 	if ok {
@@ -314,12 +297,7 @@ func (pa *PlatformAdapterGocq) SendFileToGroup(ctx *MsgContext, groupID string, 
 	if groupID == "" {
 		return
 	}
-	rawID, idType := pa.mustExtractID(groupID)
-	if idType == 0 {
-		// qq频道尚不支持文件发送，降级
-		pa.SendToChannelGroup(ctx, groupID, fmt.Sprintf("[尝试发送文件: %s，但不支持]", filepath.Base(path)), flag)
-		return
-	}
+	rawID, _ := pa.mustExtractID(groupID)
 
 	dice := pa.Session.Parent
 	// 路径可以是 http/base64/本地路径，但 gocq 的文件上传只支持本地文件，所以临时下载到本地

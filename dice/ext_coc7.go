@@ -523,10 +523,6 @@ func RegisterBuiltinExtCoc7(self *Dice) {
 			}
 
 			if isHide {
-				if msg.Platform == "QQ-CH" {
-					ReplyToSender(mctx, msg, "QQ频道内尚不支持暗骰")
-					return CmdExecuteResult{Matched: true, Solved: true}
-				}
 				if mctx.IsPrivate {
 					ReplyToSender(mctx, msg, DiceFormatTmpl(mctx, "核心:提示_私聊不可用"))
 				} else {

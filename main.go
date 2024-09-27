@@ -21,12 +21,12 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap/zapcore"
 
-	"sealdice-core/api"
-	"sealdice-core/dice"
-	diceLogger "sealdice-core/dice/logger"
-	"sealdice-core/dice/model"
-	"sealdice-core/migrate"
-	"sealdice-core/static"
+	"tempestdice/api"
+	"tempestdice/dice"
+	diceLogger "tempestdice/dice/logger"
+	"tempestdice/dice/model"
+	"tempestdice/migrate"
+	"tempestdice/static"
 )
 
 /**
@@ -255,16 +255,6 @@ func main() {
 	// 初始化核心
 	diceManager.TryCreateDefault()
 	diceManager.InitDice()
-	go func() {
-		// 每5分钟做一次新版本检查
-		for {
-			go CheckVersion(diceManager)
-			time.Sleep(5 * time.Minute)
-		}
-	}()
-	go RebootRequestListen(diceManager)
-	go UpdateRequestListen(diceManager)
-	go UpdateCheckRequestListen(diceManager)
 
 	// 强制清理机制
 	go (func() {
@@ -307,7 +297,7 @@ func main() {
 		w.Run()
 	}()*/
 	initEndTime := time.Now().UnixMicro()
-	fmt.Printf("%s%d%s", "初始化完成，耗时: ", int((initEndTime-initStartTime)/1000), "毫秒\n")
+	diceManager.Dice[0].Logger.Info(fmt.Sprintf("%s%d%s", "初始化完成，耗时: ", int((initEndTime-initStartTime)/1000), "毫秒\n"))
 	// OOM分析工具
 	// err = nil
 	// err = http.ListenAndServe(":9090", nil)
@@ -317,17 +307,6 @@ func main() {
 
 	// darwin 的托盘菜单似乎需要在主线程启动才能工作，调整到这里
 	trayInit(diceManager)
-}
-
-func removeUpdateFiles() {
-	// 无论原因，只要走到这里全部删除
-	_ = os.Remove("./auto_update_ok")
-	_ = os.Remove("./auto_update.exe")
-	_ = os.Remove("./auto_updat3.exe")
-	_ = os.Remove("./auto_update_ok")
-	_ = os.Remove("./auto_update")
-	_ = os.Remove("./_delete_me.exe")
-	_ = os.RemoveAll("./update")
 }
 
 func diceServe(d *dice.Dice) {

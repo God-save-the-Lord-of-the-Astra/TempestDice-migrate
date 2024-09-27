@@ -15,7 +15,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"sealdice-core/utils/procs"
+	"tempestdice/utils/procs"
 )
 
 type LagrangeLoginInfo struct {

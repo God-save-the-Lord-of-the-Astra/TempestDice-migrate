@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"sealdice-core/utils"
+	"tempestdice/utils"
 
 	"github.com/jmoiron/sqlx"
 

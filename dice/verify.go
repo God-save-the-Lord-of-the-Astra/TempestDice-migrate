@@ -9,7 +9,7 @@ import (
 	"github.com/Milly/go-base2048"
 	"github.com/vmihailenco/msgpack"
 
-	"sealdice-core/utils/crypto"
+	"tempestdice/utils/crypto"
 )
 
 var (

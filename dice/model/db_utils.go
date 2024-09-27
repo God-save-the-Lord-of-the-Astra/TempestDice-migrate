@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"sync"
 
-	"sealdice-core/utils/spinner"
+	"tempestdice/utils/spinner"
 )
 
 func DBCacheDelete() bool {

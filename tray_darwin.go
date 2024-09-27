@@ -18,8 +18,8 @@ import (
 	"github.com/gen2brain/beeep"
 	"github.com/labstack/echo/v4"
 
-	"sealdice-core/dice"
-	"sealdice-core/icon"
+	"tempestdice/dice"
+	"tempestdice/icon"
 )
 
 var theDm *dice.DiceManager

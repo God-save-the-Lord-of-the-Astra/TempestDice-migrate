@@ -8,7 +8,7 @@ import (
 func RegisterBuiltinMdiceCommands(d *Dice) {
 	HelpForMDiceBot := ".bot on/off"
 	cmdMDiceBot := CmdItemInfo{
-		Name:      "MDicebot",
+		Name:      "MDiceBot",
 		ShortHelp: HelpForMDiceBot,
 		Help:      "骰子管理:\n" + HelpForMDiceBot,
 		Raw:       true,

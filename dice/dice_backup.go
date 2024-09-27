@@ -13,9 +13,9 @@ import (
 
 	"github.com/alexmullins/zip"
 
-	"sealdice-core/dice/model"
-	"sealdice-core/utils"
-	"sealdice-core/utils/crypto"
+	"tempestdice/dice/model"
+	"tempestdice/utils"
+	"tempestdice/utils/crypto"
 )
 
 const BackupDir = "./backups"

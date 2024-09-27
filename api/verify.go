@@ -3,7 +3,7 @@ package api
 import (
 	"github.com/labstack/echo/v4"
 
-	"sealdice-core/dice"
+	"tempestdice/dice"
 )
 
 func verifyGenerateCode(c echo.Context) error {

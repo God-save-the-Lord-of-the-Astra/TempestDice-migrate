@@ -17,7 +17,7 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/samber/lo"
 
-	"sealdice-core/dice"
+	"tempestdice/dice"
 )
 
 const CodeAlreadyExists = 602

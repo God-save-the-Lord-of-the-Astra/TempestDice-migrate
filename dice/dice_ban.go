@@ -8,7 +8,7 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	"sealdice-core/dice/model"
+	"tempestdice/dice/model"
 )
 
 type BanRankType int

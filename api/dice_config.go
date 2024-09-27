@@ -11,8 +11,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"golang.org/x/time/rate"
 
-	"sealdice-core/dice"
-	"sealdice-core/utils"
+	"tempestdice/dice"
+	"tempestdice/utils"
 )
 
 type DiceConfigInfo struct {

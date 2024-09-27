@@ -10,7 +10,7 @@ import (
 	ds "github.com/sealdice/dicescript"
 	"go.uber.org/zap"
 
-	"sealdice-core/dice/model"
+	"tempestdice/dice/model"
 )
 
 type AttrsManager struct {

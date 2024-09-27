@@ -6,7 +6,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"sealdice-core/dice/censor"
+	"tempestdice/dice/censor"
 )
 
 type CensorLog struct {

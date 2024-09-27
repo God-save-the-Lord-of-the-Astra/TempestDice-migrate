@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"sealdice-core/message"
-	"sealdice-core/utils"
+	"tempestdice/message"
+	"tempestdice/utils"
 )
 
 type HTTPSimpleMessage struct {

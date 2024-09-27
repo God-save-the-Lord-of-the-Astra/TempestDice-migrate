@@ -10,8 +10,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"sealdice-core/dice/censor"
-	"sealdice-core/dice/model"
+	"tempestdice/dice/censor"
+	"tempestdice/dice/model"
 )
 
 type CensorManager struct {

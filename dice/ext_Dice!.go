@@ -274,7 +274,7 @@ func RegisterBuiltinShikiCommands(d *Dice) {
 	cmdShikiBot := CmdItemInfo{
 		Name:      "Dice!Bot",
 		ShortHelp: HelpForShikiBot,
-		Help:      "黑名单接收:\n" + HelpForShikiBot,
+		Help:      "骰子开关:\n" + HelpForShikiBot,
 		Solve: func(ctx *MsgContext, msg *Message, cmdArgs *CmdArgs) CmdExecuteResult {
 			inGroup := msg.MessageType == "group"
 
@@ -313,7 +313,7 @@ func RegisterBuiltinShikiCommands(d *Dice) {
 				val := cmdArgs.GetArgN(1)
 				switch strings.ToLower(val) {
 				case "on":
-					if !(msg.Platform == "QQ-CH" || ctx.Dice.BotExtFreeSwitch || ctx.PrivilegeLevel >= 40) {
+					if !(ctx.Dice.BotExtFreeSwitch || ctx.PrivilegeLevel >= 40) {
 						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_无权限_非master/管理/邀请者"))
 						return CmdExecuteResult{Matched: true, Solved: true}
 					}
@@ -362,7 +362,107 @@ func RegisterBuiltinShikiCommands(d *Dice) {
 			return CmdExecuteResult{Matched: true, Solved: true}
 		},
 	}
+	HelpForShikiAdminNotceAdd := ""
+	HelpForShikiAdminNotceDel := ""
+	HelpForShikiAdminNoticeClr := ""
+	HelpForShikiAdminNotceList := ""
+	HelpForShikiAdmin := "" + HelpForShikiAdminNotceAdd + "\n" + HelpForShikiAdminNotceDel + "\n" + HelpForShikiAdminNoticeClr + "\n" + HelpForShikiAdminNotceList
+	HelpForShikiAdminNotce := ""
+	cmdShikiAdmin := CmdItemInfo{
+		Name:      "Dice!Admin",
+		ShortHelp: HelpForShikiAdmin,
+		Help:      "骰子管理:\n" + HelpForShikiAdmin,
+		Solve: func(ctx *MsgContext, msg *Message, cmdArgs *CmdArgs) CmdExecuteResult {
+			cmdNum := len(cmdArgs.Args)
+			val := cmdArgs.GetArgN(1)
+			subval := cmdArgs.GetArgN(2)
+			trdval := cmdArgs.GetArgN(3)
+			switch strings.ToLower(val) {
+			case "notice":
+				switch strings.ToLower(subval) {
+				case "+", "add":
+					if cmdNum < 4 {
+						if trdval != "" {
+							if strings.ToLower(trdval) == "help" {
+								ReplyToSender(ctx, msg, HelpForShikiAdminNotceAdd)
+								return CmdExecuteResult{Matched: true, Solved: true}
+							}
+							if strings.HasPrefix(trdval, "g") {
+								trdval = strings.ReplaceAll(trdval, "g", "QQ-Group:")
+							} else if strings.HasPrefix(trdval, "p") {
+								trdval = strings.ReplaceAll(trdval, "p", "QQ:")
+							}
+							if strings.HasPrefix(trdval, "QQ:") || strings.HasPrefix(trdval, "QQ-Group:") {
+								d.NoticeIDs = append(d.NoticeIDs, trdval)
+								d.Save(false)
+							}
+						}
+					} else {
+						ReplyToSender(ctx, msg, HelpForShikiAdminNotce)
+						return CmdExecuteResult{Matched: true, Solved: true}
+					}
+				case "-", "del":
+					if cmdNum >= 4 {
+						if strings.HasPrefix(trdval, "g") {
+							trdval = strings.ReplaceAll(trdval, "g", "QQ-Group:")
+						} else if strings.HasPrefix(trdval, "p") {
+							trdval = strings.ReplaceAll(trdval, "p", "QQ:")
+						}
+						if strings.HasPrefix(trdval, "QQ:") || strings.HasPrefix(trdval, "QQ-Group:") {
+							if len(d.NoticeIDs) == 0 {
+								ReplyToSender(ctx, msg, "骰子管理: 通知列表为空")
+								return CmdExecuteResult{Matched: true, Solved: true}
+							} else if trdval == "help" {
+								ReplyToSender(ctx, msg, HelpForShikiAdminNotceDel)
+								return CmdExecuteResult{Matched: true, Solved: true}
+							}
+							for i, id := range d.NoticeIDs {
+								if id == trdval {
+									d.NoticeIDs = append(d.NoticeIDs[:i], d.NoticeIDs[i+1:]...)
+									d.Save(false)
+									break
+								}
+							}
+						}
+					} else {
+						ReplyToSender(ctx, msg, HelpForShikiAdminNotce)
+						return CmdExecuteResult{Matched: true, Solved: true}
+					}
 
+				case "clr":
+					if strings.ToLower(trdval) == "help" {
+						ReplyToSender(ctx, msg, HelpForShikiAdminNoticeClr)
+						return CmdExecuteResult{Matched: true, Solved: true}
+					}
+					d.NoticeIDs = []string{}
+					d.Save(false)
+					ReplyToSender(ctx, msg, "骰子管理: 通知列表已清空")
+					return CmdExecuteResult{Matched: true, Solved: true}
+				case "list":
+					if len(d.NoticeIDs) == 0 {
+						ReplyToSender(ctx, msg, "骰子管理: 通知列表为空")
+						return CmdExecuteResult{Matched: true, Solved: true}
+					} else if strings.ToLower(trdval) == "help" {
+						ReplyToSender(ctx, msg, "")
+						return CmdExecuteResult{Matched: true, Solved: true}
+					}
+					text := "骰子管理: 通知列表\n"
+					for _, id := range d.NoticeIDs {
+						text += id + "\n"
+					}
+					ReplyToSender(ctx, msg, text)
+					return CmdExecuteResult{Matched: true, Solved: true}
+				default:
+					ReplyToSender(ctx, msg, HelpForShikiAdminNotce)
+					return CmdExecuteResult{Matched: true, Solved: true}
+				}
+			default:
+				return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			}
+
+			return CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
 	d.RegisterExtension(&ExtInfo{
 		Name:            "Dice!Core", // 扩展的名称，需要用于指令中，写简短点      2024.05.10: 目前被看成是 function 的缩写了（
 		Version:         "1.0.0",
@@ -379,6 +479,7 @@ func RegisterBuiltinShikiCommands(d *Dice) {
 		CmdMap: CmdMapCls{
 			"warning": &cmdShikiWarning,
 			"bot":     &cmdShikiBot,
+			"admin":   &cmdShikiAdmin,
 		},
 	})
 }

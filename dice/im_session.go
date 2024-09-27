@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"sealdice-core/dice/model"
-	"sealdice-core/message"
+	"tempestdice/dice/model"
+	"tempestdice/message"
 
 	"github.com/golang-module/carbon"
 	ds "github.com/sealdice/dicescript"
@@ -443,9 +443,6 @@ func (s *IMSession) Execute(ep *EndPointInfo, msg *Message, runInSync bool) {
 		if !ok && msg.GroupID != "" {
 			// 注意: 此处必须开启，不然下面mctx.player取不到
 			autoOn := true
-			if msg.Platform == "QQ-CH" {
-				autoOn = d.QQChannelAutoOn
-			}
 			groupInfo = SetBotOnAtGroup(mctx, msg.GroupID)
 			groupInfo.Active = autoOn
 			groupInfo.DiceIDExistsMap.Store(ep.UserID, true)
@@ -462,7 +459,7 @@ func (s *IMSession) Execute(ep *EndPointInfo, msg *Message, runInSync bool) {
 			log.Info(txt)
 			mctx.Notice(txt)
 
-			if msg.Platform == "QQ" || msg.Platform == "TG" {
+			if msg.Platform == "QQ" {
 				// ServiceAtNew changed
 				// Pinenutn:这个i不知道是啥，放你一马（
 				activatedList, _ := mctx.Session.ServiceAtNew.Load(msg.GroupID)
@@ -595,12 +592,6 @@ func (s *IMSession) Execute(ep *EndPointInfo, msg *Message, runInSync bool) {
 				if d.OnlyLogCommandInGroup {
 					// 检查上级选项
 					doLog = false
-				}
-				if doLog {
-					// 检查QQ频道的独立选项
-					if msg.Platform == "QQ-CH" && (!d.QQChannelLogMessage) {
-						doLog = false
-					}
 				}
 				if doLog {
 					log.Infof("收到群(%s)内<%s>(%s)的消息: %s", msg.GroupID, msg.Sender.Nickname, msg.Sender.UserID, msg.Message)
@@ -806,9 +797,6 @@ func (s *IMSession) ExecuteNew(ep *EndPointInfo, msg *Message) {
 	if !ok && msg.GroupID != "" {
 		// 注意: 此处必须开启，不然下面mctx.player取不到
 		autoOn := true
-		if msg.Platform == "QQ-CH" {
-			autoOn = d.QQChannelAutoOn
-		}
 		groupInfo = SetBotOnAtGroup(mctx, msg.GroupID)
 		groupInfo.Active = autoOn
 		groupInfo.DiceIDExistsMap.Store(ep.UserID, true)
@@ -828,7 +816,7 @@ func (s *IMSession) ExecuteNew(ep *EndPointInfo, msg *Message) {
 		log.Info(txt)
 		mctx.Notice(txt)
 
-		if msg.Platform == "QQ" || msg.Platform == "TG" {
+		if msg.Platform == "QQ" {
 			groupInfo, ok = mctx.Session.ServiceAtNew.Load(msg.GroupID)
 			if ok {
 				for _, i := range groupInfo.ActivatedExtList {
@@ -932,12 +920,6 @@ func (s *IMSession) ExecuteNew(ep *EndPointInfo, msg *Message) {
 			if d.OnlyLogCommandInGroup {
 				// 检查上级选项
 				doLog = false
-			}
-			if doLog {
-				// 检查QQ频道的独立选项
-				if msg.Platform == "QQ-CH" && (!d.QQChannelLogMessage) {
-					doLog = false
-				}
 			}
 			if doLog {
 				log.Infof("收到群(%s)内<%s>(%s)的消息: %s", msg.GroupID, msg.Sender.Nickname, msg.Sender.UserID, msg.Message)

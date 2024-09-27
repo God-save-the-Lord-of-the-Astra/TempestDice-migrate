@@ -12,9 +12,9 @@ import (
 	"github.com/jmoiron/sqlx"
 	ds "github.com/sealdice/dicescript"
 
-	"sealdice-core/dice"
-	"sealdice-core/dice/model"
-	"sealdice-core/utils"
+	"tempestdice/dice"
+	"tempestdice/dice/model"
+	"tempestdice/utils"
 )
 
 func convertToNew(name string, ownerId string, data []byte, updatedAt int64) (*model.AttributesItemModel, error) {

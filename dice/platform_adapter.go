@@ -1,6 +1,6 @@
 package dice
 
-import "sealdice-core/message"
+import "tempestdice/message"
 
 type PlatformAdapter interface {
 	Serve() int

@@ -27,31 +27,27 @@ import (
 	"golang.org/x/exp/slices"
 	"golang.org/x/time/rate"
 
-	"sealdice-core/dice/censor"
-	"sealdice-core/dice/logger"
-	"sealdice-core/dice/model"
+	"tempestdice/dice/censor"
+	"tempestdice/dice/logger"
+	"tempestdice/dice/model"
+	"tempestdice/versioninfo"
 )
 
 var (
-	APPNAME = "SealDice-custom"
+	AppGoVersion = "go1.23.1"
 
+	APPNAME = versioninfo.APPNAME
 	// VERSION 版本号，按固定格式，action 在构建时可能会自动注入部分信息
 	// 正式：主版本号+yyyyMMdd，如 1.4.5+20240308
 	// dev：主版本号-dev+yyyyMMdd.7位hash，如 1.4.5-dev+20240308.1a2b3c4
 	// rc：主版本号-rc.序号+yyyyMMdd.7位hash如 1.4.5-rc.0+20240308.1a2b3c4，1.4.5-rc.1+20240309.2a3b4c4，……
+	VERSION_MAIN           = versioninfo.SEAL_VERSION_MAIN
+	VERSION_PRERELEASE     = versioninfo.SEAL_VERSION_PRERELEASE
+	VERSION_BUILD_METADATA = versioninfo.SEAL_VERSION_BUILD_METADATA
+	VERSION_CODE           = versioninfo.SEAL_VERSION_CODE //nolint:revive
+	APP_CHANNEL            = versioninfo.SEAL_APP_CHANNEL
+
 	VERSION = semver.MustParse(VERSION_MAIN + VERSION_PRERELEASE + VERSION_BUILD_METADATA)
-
-	// VERSION_MAIN 主版本号
-	VERSION_MAIN = "1.5.0"
-	// VERSION_PRERELEASE 先行版本号
-	VERSION_PRERELEASE = "-custom-rc.2"
-	// VERSION_BUILD_METADATA 版本编译信息
-	VERSION_BUILD_METADATA = ""
-
-	// APP_CHANNEL 更新频道，stable/dev，在 action 构建时自动注入
-	APP_CHANNEL = "" //nolint:revive
-
-	VERSION_CODE = int64(1004006) //nolint:revive
 
 	VERSION_JSAPI_COMPATIBLE = []*semver.Version{
 		VERSION,

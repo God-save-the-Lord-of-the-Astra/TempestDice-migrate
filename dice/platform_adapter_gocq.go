@@ -21,8 +21,8 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
-	"sealdice-core/message"
-	"sealdice-core/utils/procs"
+	"tempestdice/message"
+	"tempestdice/utils/procs"
 )
 
 // 0 默认 1登录中 2登录中-二维码 3登录中-滑条 4登录中-手机验证码 10登录成功 11登录失败
@@ -456,14 +456,6 @@ func (pa *PlatformAdapterGocq) Serve() int {
 		// if strings.Contains(message, `.`) {
 		//	log.Info("...", message)
 		// }
-		if strings.Contains(message, `"guild_id"`) {
-			// log.Info("!!!", message, s.Parent.WorkInQQChannel)
-			// 暂时忽略频道消息
-			if s.Parent.WorkInQQChannel {
-				pa.QQChannelTrySolve(message)
-			}
-			return
-		}
 
 		msgQQ := new(MessageQQ)
 		err := json.Unmarshal([]byte(message), msgQQ)

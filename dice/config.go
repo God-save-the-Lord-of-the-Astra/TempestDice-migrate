@@ -17,8 +17,8 @@ import (
 	"golang.org/x/time/rate"
 	"gopkg.in/yaml.v3"
 
-	"sealdice-core/dice/model"
-	"sealdice-core/utils"
+	"tempestdice/dice/model"
+	"tempestdice/utils"
 )
 
 // type TextTemplateWithWeight = map[string]map[string]uint
