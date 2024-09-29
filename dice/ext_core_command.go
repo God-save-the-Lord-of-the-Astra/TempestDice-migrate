@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path"
 	"regexp"
 	"runtime"
@@ -18,6 +19,188 @@ import (
 	cp "github.com/otiai10/copy"
 	ds "github.com/sealdice/dicescript"
 )
+
+func getCPUModel() string {
+	var cpuModel string
+	switch runtime.GOOS {
+	case "windows":
+		cmd := exec.Command("wmic", "cpu", "get", "name")
+		output, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(string(output), "\n")
+			if len(lines) > 1 {
+				cpuModel = strings.TrimSpace(lines[1])
+			}
+		}
+	case "darwin":
+		cmd := exec.Command("sysctl", "-n", "machdep.cpu.brand_string")
+		output, err := cmd.Output()
+		if err == nil {
+			cpuModel = strings.TrimSpace(string(output))
+		}
+	case "linux":
+		cmd := exec.Command("cat", "/proc/cpuinfo")
+		output, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(string(output), "\n")
+			for _, line := range lines {
+				if strings.Contains(line, "model name") {
+					cpuModel = strings.Split(line, ":")[1]
+					cpuModel = strings.TrimSpace(cpuModel)
+					break
+				}
+			}
+		}
+	}
+	return cpuModel
+}
+
+// 获取CPU使用率
+func getCPUUsage() float64 {
+	var cpuPercent float64
+	switch runtime.GOOS {
+	case "windows":
+		cmd := exec.Command("wmic", "cpu", "get", "loadpercentage")
+		output, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(string(output), "\n")
+			if len(lines) > 1 {
+				cpuPercent, _ = strconv.ParseFloat(strings.TrimSpace(lines[1]), 64)
+			}
+		}
+	case "darwin":
+		cmd := exec.Command("top", "-l", "1", "-n", "0")
+		output, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(string(output), "\n")
+			for _, line := range lines {
+				if strings.Contains(line, "CPU usage:") {
+					fields := strings.Fields(line)
+					user, _ := strconv.ParseFloat(strings.TrimSuffix(fields[2], "%"), 64)
+					sys, _ := strconv.ParseFloat(strings.TrimSuffix(fields[4], "%"), 64)
+					cpuPercent = user + sys
+					break
+				}
+			}
+		}
+	case "linux":
+		cmd := exec.Command("top", "-bn1")
+		output, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(string(output), "\n")
+			for _, line := range lines {
+				if strings.Contains(line, "Cpu(s):") {
+					fields := strings.Fields(line)
+					user, _ := strconv.ParseFloat(strings.TrimSuffix(fields[1], "%"), 64)
+					sys, _ := strconv.ParseFloat(strings.TrimSuffix(fields[3], "%"), 64)
+					cpuPercent = user + sys
+					break
+				}
+			}
+		}
+	}
+	return cpuPercent
+}
+
+// 获取内存使用率
+func getMemoryUsage() float64 {
+	var memUsedPercent float64
+	switch runtime.GOOS {
+	case "windows":
+		cmd := exec.Command("wmic", "os", "get", "freephysicalmemory,totalvisiblememorysize")
+		output, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(string(output), "\n")
+			if len(lines) > 1 {
+				fields := strings.Fields(lines[1])
+				if len(fields) == 2 {
+					freeMem, _ := strconv.ParseFloat(fields[0], 64)
+					totalMem, _ := strconv.ParseFloat(fields[1], 64)
+					memUsedPercent = (1 - freeMem/totalMem) * 100
+				}
+			}
+		}
+	case "darwin":
+		cmd := exec.Command("vm_stat")
+		output, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(string(output), "\n")
+			var free, active, inactive, wired int64
+			pageSize := int64(4096)
+			for _, line := range lines {
+				if strings.Contains(line, "Pages free:") {
+					free, _ = strconv.ParseInt(strings.Fields(line)[2], 10, 64)
+				} else if strings.Contains(line, "Pages active:") {
+					active, _ = strconv.ParseInt(strings.Fields(line)[2], 10, 64)
+				} else if strings.Contains(line, "Pages inactive:") {
+					inactive, _ = strconv.ParseInt(strings.Fields(line)[2], 10, 64)
+				} else if strings.Contains(line, "Pages wired down:") {
+					wired, _ = strconv.ParseInt(strings.Fields(line)[3], 10, 64)
+				}
+			}
+			totalMem := (free + active + inactive + wired) * pageSize
+			usedMem := (active + inactive + wired) * pageSize
+			memUsedPercent = float64(usedMem) / float64(totalMem) * 100
+		}
+	case "linux":
+		cmd := exec.Command("free", "-m")
+		output, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(string(output), "\n")
+			if len(lines) > 1 {
+				fields := strings.Fields(lines[1])
+				totalMem, _ := strconv.ParseFloat(fields[1], 64)
+				usedMem, _ := strconv.ParseFloat(fields[2], 64)
+				memUsedPercent = (usedMem / totalMem) * 100
+			}
+		}
+	}
+	return memUsedPercent
+}
+
+// 获取磁盘使用率
+func getDiskUsage() float64 {
+	var diskFreeGB float64
+	switch runtime.GOOS {
+	case "windows":
+		cmd := exec.Command("wmic", "logicaldisk", "get", "size,freespace,caption")
+		output, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(string(output), "\n")
+			for _, line := range lines {
+				fields := strings.Fields(line)
+				if len(fields) == 3 && strings.HasPrefix(fields[0], "C:") {
+					freeSpace, _ := strconv.ParseFloat(fields[1], 64)
+					diskFreeGB = freeSpace / (1024 * 1024 * 1024)
+					break
+				}
+			}
+		}
+	case "darwin":
+		cmd := exec.Command("df", "-k", "/")
+		output, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(string(output), "\n")
+			if len(lines) > 1 {
+				fields := strings.Fields(lines[1])
+				freeSpace, _ := strconv.ParseFloat(fields[3], 64)
+				diskFreeGB = freeSpace / (1024 * 1024)
+			}
+		}
+	case "linux":
+		cmd := exec.Command("df", "-k", "/")
+		output, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(string(output), "\n")
+			if len(lines) > 1 {
+				fields := strings.Fields(lines[1])
+				freeSpace, _ := strconv.ParseFloat(fields[3], 64)
+				diskFreeGB = freeSpace / (1024 * 1024)
+			}
+		}
+	}
+	return diskFreeGB
+}
 
 func RegisterBuiltinCoreCommands(d *Dice) {
 	helpForBlack := ".black add user <帐号> [<原因>] //添加个人\n" +
@@ -1737,13 +1920,74 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 			return CmdExecuteResult{Matched: true, Solved: true}
 		},
 	}
+
+	helpForSystem := ".system state/status //查看系统资源占用\n" +
+		".system reload/reboot //重启骰子核心\n" +
+		".system save //保存核心数据"
+	cmdSystem := CmdItemInfo{
+		Name:      "system",
+		ShortHelp: helpForSystem,
+		Help:      "骰子管理：\n" + helpForSystem,
+		Solve: func(ctx *MsgContext, msg *Message, cmdArgs *CmdArgs) CmdExecuteResult {
+			if ctx.PrivilegeLevel < 100 {
+				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_无权限"))
+				return CmdExecuteResult{Matched: true, Solved: true}
+			}
+			if cmdArgs.IsArgEqual(1, "state") || cmdArgs.IsArgEqual(1, "status") {
+				activeCount := 0
+				serveCount := 0
+				// Pinenutn: Range模板 ServiceAtNew重构代码
+				d.ImSession.ServiceAtNew.Range(func(_ string, gp *GroupInfo) bool {
+					// Pinenutn: ServiceAtNew重构
+					if gp.GroupID != "" &&
+						!strings.HasPrefix(gp.GroupID, "PG-") &&
+						gp.DiceIDExistsMap.Exists(ctx.EndPoint.UserID) {
+						serveCount++
+						if gp.DiceIDActiveMap.Exists(ctx.EndPoint.UserID) {
+							activeCount++
+						}
+					}
+					return true
+				})
+
+				// 获取当前时间
+				currentTime := time.Now().Format("2006-01-02 15:04:05")
+
+				// 获取CPU信息
+				cpuModel := getCPUModel()
+				cpuUsage := getCPUUsage()
+
+				// 获取内存信息
+				memUsedPercent := getMemoryUsage()
+
+				// 获取磁盘信息
+				diskFreeGB := getDiskUsage()
+
+				ReplyToSender(ctx, msg, fmt.Sprintf("本地时间:%s\n所在群聊数:%d\n开启群聊数:%d\n内存占用:%.2f%%\nCPU型号:%s\nCPU使用率:%.2f%%\n硬盘剩余空间:%.2fGB\n",
+					currentTime, serveCount, activeCount, memUsedPercent, cpuModel, cpuUsage, diskFreeGB))
+				return CmdExecuteResult{Matched: true, Solved: true}
+			} else if cmdArgs.IsArgEqual(1, "reload") || cmdArgs.IsArgEqual(1, "reboot") {
+				var dm = ctx.Dice.Parent
+				ReplyToSender(ctx, msg, "3秒后开始重启")
+				time.Sleep(3 * time.Second)
+				dm.RebootRequestChan <- 1
+				return CmdExecuteResult{Matched: true, Solved: true}
+			} else if cmdArgs.IsArgEqual(1, "save") {
+				d.Save(false)
+				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:骰子保存设置"))
+				return CmdExecuteResult{Matched: true, Solved: true}
+			}
+			return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+		},
+	}
+
 	d.RegisterExtension(&ExtInfo{
 		Name:            "core", // 扩展的名称，需要用于指令中，写简短点      2024.05.10: 目前被看成是 function 的缩写了（
 		Version:         "1.0.0",
 		Brief:           "核心指令",
 		AutoActive:      true, // 是否自动开启
 		ActiveOnPrivate: true,
-		Author:          "木落",
+		Author:          "木落,海棠,星界之主",
 		Official:        true,
 		OnCommandReceived: func(ctx *MsgContext, msg *Message, cmdArgs *CmdArgs) {
 		},
@@ -1764,6 +2008,7 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 			"set":     &cmdSet,
 			"pc":      &cmdChar,
 			"reply":   &cmdReply,
+			"system":  &cmdSystem,
 		},
 	})
 }

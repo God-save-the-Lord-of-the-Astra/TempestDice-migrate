@@ -23,10 +23,13 @@ func (d *Dice) RegisterBuiltinExt() {
 	RegisterBuiltinExtDnd5e(d)
 	RegisterBuiltinStory(d)
 	RegisterBuiltinExtExp(d)
+	RegisterBuiltinCloudCommands(d)
 
 	RegisterBuiltinSealdiceCommands(d)
 	RegisterBuiltinMdiceCommands(d)
 	RegisterBuiltinShikiCommands(d)
+
+	RegisterBuiltinLuaReply(d)
 
 	d.RegisterBuiltinSystemTemplate()
 }

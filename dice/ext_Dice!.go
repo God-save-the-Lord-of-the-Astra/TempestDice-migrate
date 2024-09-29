@@ -373,13 +373,38 @@ func RegisterBuiltinShikiCommands(d *Dice) {
 		ShortHelp: HelpForShikiAdmin,
 		Help:      "骰子管理:\n" + HelpForShikiAdmin,
 		Solve: func(ctx *MsgContext, msg *Message, cmdArgs *CmdArgs) CmdExecuteResult {
+			if ctx.PrivilegeLevel < 100 {
+				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_无权限_非master"))
+				return CmdExecuteResult{Matched: true, Solved: true}
+			}
 			cmdNum := len(cmdArgs.Args)
 			val := cmdArgs.GetArgN(1)
 			subval := cmdArgs.GetArgN(2)
 			trdval := cmdArgs.GetArgN(3)
+			var uid string
+			getID := func() string {
+				if cmdArgs.IsArgEqual(2, "-") || cmdArgs.IsArgEqual(2, "+") {
+					id := cmdArgs.GetArgN(3)
+					if id == "" {
+						return ""
+					}
+
+					isGroup := cmdArgs.IsArgEqual(1, "blackgroup")
+					return FormatDiceID(ctx, id, isGroup)
+				}
+
+				arg := cmdArgs.GetArgN(2)
+				if !strings.Contains(arg, ":") {
+					return ""
+				}
+				return arg
+			}
 			switch strings.ToLower(val) {
 			case "notice":
 				switch strings.ToLower(subval) {
+				case "help":
+					ReplyToSender(ctx, msg, HelpForShikiAdminNotce)
+					return CmdExecuteResult{Matched: true, Solved: true}
 				case "+", "add":
 					if cmdNum < 4 {
 						if trdval != "" {
@@ -395,10 +420,11 @@ func RegisterBuiltinShikiCommands(d *Dice) {
 							if strings.HasPrefix(trdval, "QQ:") || strings.HasPrefix(trdval, "QQ-Group:") {
 								d.NoticeIDs = append(d.NoticeIDs, trdval)
 								d.Save(false)
+								ReplyToSender(ctx, msg, "骰子管理: 已添加通知窗口"+trdval)
 							}
 						}
 					} else {
-						ReplyToSender(ctx, msg, HelpForShikiAdminNotce)
+						ReplyToSender(ctx, msg, HelpForShikiAdminNotceAdd)
 						return CmdExecuteResult{Matched: true, Solved: true}
 					}
 				case "-", "del":
@@ -420,12 +446,13 @@ func RegisterBuiltinShikiCommands(d *Dice) {
 								if id == trdval {
 									d.NoticeIDs = append(d.NoticeIDs[:i], d.NoticeIDs[i+1:]...)
 									d.Save(false)
+									ReplyToSender(ctx, msg, "骰子管理: 已删除通知窗口"+trdval)
 									break
 								}
 							}
 						}
 					} else {
-						ReplyToSender(ctx, msg, HelpForShikiAdminNotce)
+						ReplyToSender(ctx, msg, HelpForShikiAdminNotceDel)
 						return CmdExecuteResult{Matched: true, Solved: true}
 					}
 
@@ -453,9 +480,144 @@ func RegisterBuiltinShikiCommands(d *Dice) {
 					ReplyToSender(ctx, msg, text)
 					return CmdExecuteResult{Matched: true, Solved: true}
 				default:
-					ReplyToSender(ctx, msg, HelpForShikiAdminNotce)
+					ReplyToSender(ctx, msg, HelpForShikiAdminNotceList)
 					return CmdExecuteResult{Matched: true, Solved: true}
 				}
+			case "dismiss":
+				gid := cmdArgs.GetArgN(2)
+				if gid == "" || gid == "help" {
+					return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+				}
+
+				n := strings.Split(gid, ":") // 不验证是否合法，反正下面会检查是否在 ServiceAtNew
+				if strings.HasPrefix(gid, "g") {
+					gid = strings.ReplaceAll(gid, "g", "")
+				}
+				gid = "QQ-Group:" + gid // 强制当作QQ群聊处理
+				gp, ok := ctx.Session.ServiceAtNew.Load(gid)
+				if !ok || len(n[0]) < 2 {
+					ReplyToSender(ctx, msg, fmt.Sprintf("群组列表中没有找到%s", gid))
+					return CmdExecuteResult{Matched: true, Solved: true}
+				}
+
+				// 既然是骰主自己操作，就不通知了
+				// 除非有多骰主……
+				ReplyToSender(ctx, msg, fmt.Sprintf("收到指令，将在5秒后退出群组%s", gp.GroupID))
+
+				txt := "注意，收到骰主指令，5秒后将从该群组退出。"
+				wherefore := cmdArgs.GetArgN(3)
+				if wherefore != "" {
+					txt += fmt.Sprintf("原因: %s", wherefore)
+				}
+
+				ReplyGroup(ctx, &Message{GroupID: gp.GroupID}, txt)
+
+				mctx := &MsgContext{
+					MessageType: "group",
+					Group:       gp,
+					EndPoint:    ctx.EndPoint,
+					Session:     ctx.Session,
+					Dice:        ctx.Dice,
+					IsPrivate:   false,
+				}
+				// SetBotOffAtGroup(mctx, gp.GroupID)
+				time.Sleep(3 * time.Second)
+				gp.DiceIDExistsMap.Delete(mctx.EndPoint.UserID)
+				gp.UpdatedAtTime = time.Now().Unix()
+				mctx.EndPoint.Adapter.QuitGroup(mctx, gp.GroupID)
+
+				return CmdExecuteResult{Matched: true, Solved: true}
+
+			case "ban", "blk", "black":
+				if len(cmdArgs.Args) < 3 {
+					return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+				} else if trdval == "help" {
+					return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+				} else {
+					if strings.HasPrefix(subval, "g") {
+						subval = strings.ReplaceAll(subval, "g", "QQ-Group:")
+					} else if strings.HasPrefix(subval, "p") {
+						subval = strings.ReplaceAll(subval, "p", "QQ:")
+					}
+					if strings.HasPrefix(subval, "QQ:") || strings.HasPrefix(subval, "QQ-Group:") {
+						uid := subval
+						var reason string
+						if trdval == "" {
+							reason = "骰主指令"
+						} else {
+							reason = trdval
+						}
+						d.BanList.AddScoreBase(uid, d.BanList.ThresholdBan, "骰主指令", reason, ctx)
+						ReplyToSender(ctx, msg, fmt.Sprintf("已将用户 %s 加入黑名单，原因: %s", uid, reason))
+					}
+				}
+			case "blackqq":
+				var subval = cmdArgs.GetArgN(2)
+				if subval == "-" {
+					uid = getID()
+					if uid == "" {
+						return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+					}
+
+					item, ok := d.BanList.GetByID(uid)
+					if !ok || (item.Rank != BanRankBanned && item.Rank != BanRankTrusted && item.Rank != BanRankWarn) {
+						ReplyToSender(ctx, msg, "找不到用户")
+						break
+					}
+
+					ReplyToSender(ctx, msg, fmt.Sprintf("已将用户 %s 移出 %s 列表", uid, BanRankText[item.Rank]))
+					item.Score = 0
+					item.Rank = BanRankNormal
+
+				} else if subval == "+" {
+					uid = getID()
+					if uid == "" {
+						return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+					}
+					reason := cmdArgs.GetArgN(4)
+					if reason == "" {
+						reason = "骰主指令"
+					}
+					d.BanList.AddScoreBase(uid, d.BanList.ThresholdBan, "骰主指令", reason, ctx)
+					ReplyToSender(ctx, msg, fmt.Sprintf("已将用户 %s 加入黑名单，原因: %s", uid, reason))
+
+				} else {
+					return CmdExecuteResult{Matched: true, Solved: false, ShowHelp: true}
+				}
+			case "blackgroup":
+				var subval = cmdArgs.GetArgN(2)
+				if subval == "-" {
+					uid = getID()
+					if uid == "" {
+						return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+					}
+
+					item, ok := d.BanList.GetByID(uid)
+					if !ok || (item.Rank != BanRankBanned && item.Rank != BanRankTrusted && item.Rank != BanRankWarn) {
+						ReplyToSender(ctx, msg, "找不到群组")
+						break
+					}
+
+					ReplyToSender(ctx, msg, fmt.Sprintf("已将群组 %s 移出%s列表", uid, BanRankText[item.Rank]))
+					item.Score = 0
+					item.Rank = BanRankNormal
+
+				} else if subval == "+" {
+					uid = getID()
+					if uid == "" {
+						return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+					}
+					reason := cmdArgs.GetArgN(4)
+					if reason == "" {
+						reason = "骰主指令"
+					}
+					d.BanList.AddScoreBase(uid, d.BanList.ThresholdBan, "骰主指令", reason, ctx)
+					ReplyToSender(ctx, msg, fmt.Sprintf("已将群组 %s 加入黑名单，原因: %s", uid, reason))
+
+				} else {
+					return CmdExecuteResult{Matched: true, Solved: false, ShowHelp: true}
+				}
+
 			default:
 				return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
 			}
