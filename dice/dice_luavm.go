@@ -289,7 +289,6 @@ func LuaVarInitWithoutArgs(LuaVM *lua.LState, d *Dice, ctx *MsgContext, msg *Mes
 	LuaVM.SetField(DreamMsgTable, "fromDiceName", lua.LString(DreamMsgFromDiceName))
 	LuaVM.SetField(DreamMsgTable, "fromNick", lua.LString(DreamMsgSender_Nick))
 	LuaVM.SetField(DreamMsgTable, "fromJrrp", lua.LNumber(DreamMsgSender_Jrrp))
-
 	LuaVM.SetGlobal("dreammsg", DreamMsgTable)
 }
 

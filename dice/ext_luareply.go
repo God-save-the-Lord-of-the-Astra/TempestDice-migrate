@@ -5,85 +5,99 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
+	"time"
 
+	"github.com/fsnotify/fsnotify"
 	lua "github.com/yuin/gopher-lua"
 )
 
-func LuaReplyLoad(d *Dice) (map[string]string, error) {
-	ReplyLuaCodeMap := make(map[string]string)
-	files, err := filepath.Glob(d.GetExtDataDir("reply") + "/*.json")
-	if err != nil {
-		return nil, err
-	}
+var watcher *fsnotify.Watcher
 
+func LuaReplyLoad(d *Dice) {
+	ReplyLuaCodeMap := make(map[string]string)
+	files, _ := filepath.Glob(d.GetExtDataDir("reply") + "/*.json")
+	defaultLuaReplyExist := false
+	var filename string
 	for _, file := range files {
-		data, err := os.ReadFile(file)
-		if err != nil {
-			return nil, err
+		if runtime.GOOS == "windows" {
+			filename = "\\luareply.json"
+		} else {
+			filename = "/luareply.json"
 		}
+		if file == d.GetExtDataDir("reply")+filename {
+			defaultLuaReplyExist = true
+		}
+		data, _ := os.ReadFile(file)
 
 		var jsonData map[string]string
-		err = json.Unmarshal(data, &jsonData)
-		if err != nil {
-			return nil, err
-		}
+		json.Unmarshal(data, &jsonData)
 
 		for key, value := range jsonData {
 			ReplyLuaCodeMap[key] = value
 		}
 	}
+	if !defaultLuaReplyExist {
+		d.Logger.Infof("没有找到默认的luareply.json，请检查 %s 目录下是否存在", d.GetExtDataDir("reply"))
+	}
 
-	return ReplyLuaCodeMap, nil
+	d.CustomLuaReplyMap = ReplyLuaCodeMap
 }
 
 func RegisterBuiltinLuaReply(d *Dice) {
-	ReplyMap, err := LuaReplyLoad(d)
-	// 确保在函数结束时关闭文件
+	LuaReplyLoad(d)
+
 	LuaReplyExt := &ExtInfo{
-		Name:       "luacommandreply", // 扩展的名称，需要用于开启和关闭指令中，写简短点
+		Name:       "luareply",
 		Version:    "1.0.0",
 		Brief:      "lua指令回复模块",
 		Author:     "海棠",
-		AutoActive: true, // 是否自动开启
+		AutoActive: true,
 		Official:   true,
 		OnNotCommandReceived: func(ctx *MsgContext, msg *Message) {
-			if !ctx.Dice.CustomLuaCommandConfigEnable {
-				fmt.Println("1")
-			} else {
-				fmt.Println("0")
+			luaInitStartTime := time.Now().UnixMicro()
+			if !ctx.Dice.CustomReplyConfigEnable {
+				return
 			}
+			ReplyMap := d.CustomLuaReplyMap
 			luaVM := lua.NewState()
 			defer luaVM.Close()
 			LuaVarInitWithoutArgs(luaVM, d, ctx, msg)
 			LuaFuncInit(luaVM)
-			if err != nil {
-				ReplyToSender(ctx, msg, fmt.Sprintf("Lua 代码读取出错:\n%s", err))
-				return
-			} else {
-				cleanText, _ := AtParse(msg.Message, "")
-				cleanText = strings.TrimSpace(cleanText)
-				if ReplyMap[cleanText] != "" {
-					code := ReplyMap[cleanText]
-					if err := luaVM.DoString(fmt.Sprintf("%s %s %s", "function main() ", code, " end")); err != nil {
-						ReplyToSender(ctx, msg, fmt.Sprintf("Lua 代码执行出错:\n%s", err))
-					}
+			cleanText, _ := AtParse(msg.Message, "")
+			cleanText = strings.TrimSpace(cleanText)
 
-					// 获取 Lua 中的 `main` 函数
-					luaMain := luaVM.GetGlobal("main")
-
-					// 调用 Lua 函数
-					luaVM.Push(luaMain) // 将函数压入栈
-					luaVM.Call(0, 1)    // 调用函数，0个参数，期望1个返回值
-
-					// 获取并打印返回值
-					if luaVM.GetTop() >= 1 {
-						ReplyToSender(ctx, msg, fmt.Sprintf("%s%s", "Lua 代码执行成功，返回结果:\n", luaVM.ToString(-1))) // Lua栈中的最后一个元素（即返回值）
-					}
+			var matchedCode string
+			for pattern, code := range ReplyMap {
+				matched, err := regexp.MatchString(pattern, cleanText)
+				if err != nil {
+					d.Logger.Error(fmt.Sprintf("正则表达式编译错误: %s", err))
+					continue
+				}
+				if matched {
+					matchedCode = code
+					break
 				}
 			}
 
-			return
+			if matchedCode != "" {
+				code := matchedCode
+				if err := luaVM.DoString(fmt.Sprintf("%s %s %s", "function main() ", code, " end")); err != nil {
+					ReplyToSender(ctx, msg, fmt.Sprintf("Lua 代码执行出错:\n%s", err))
+				}
+
+				luaMain := luaVM.GetGlobal("main")
+				luaVM.Push(luaMain)
+				luaVM.Call(0, 1)
+
+				if luaVM.GetTop() >= 1 {
+					luaInitEndTime := time.Now().UnixMicro()
+					ReplyToSender(ctx, msg, luaVM.ToString(-1))
+					d.Logger.Info(fmt.Sprintf("%s%d%s", "[回复调试] lua库初始化结束，耗时: ", (luaInitEndTime-luaInitStartTime)/1000, "毫秒\n"))
+				}
+			}
 		},
 		GetDescText: GetExtensionDesc,
 		CmdMap:      CmdMapCls{},

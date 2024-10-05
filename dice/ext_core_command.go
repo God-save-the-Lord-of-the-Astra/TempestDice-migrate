@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -16,9 +16,475 @@ import (
 	"github.com/golang-module/carbon"
 	"github.com/samber/lo"
 
-	cp "github.com/otiai10/copy"
 	ds "github.com/sealdice/dicescript"
 )
+
+func handleCoreTextMapUpdate(ctx *MsgContext, msg *Message, val string, subval string, cmdArgs *CmdArgs, d *Dice) {
+	cmdNum := len(cmdArgs.Args)
+	var key, defaultText string
+	switch val {
+	case "selfname":
+		key = "骰子名字"
+		defaultText = "风暴核心"
+	case "unknownerror":
+		key = "骰子执行异常"
+		defaultText = "指令执行异常，请联系开发者，非常感谢。"
+	case "boton":
+		key = "骰子开启"
+		defaultText = "{常量:APPNAME} 已启用 {常量:VERSION}"
+	case "botoff":
+		key = "骰子关闭"
+		defaultText = "<{核心:骰子名字}> 停止服务"
+	case "replyon":
+		key = "开启自定义回复"
+		defaultText = "<{核心:骰子名字}>已在此群内开启自定义回复！\n群内工作状态:{$t旧群内状态}-->开"
+	case "replyoff":
+		key = "关闭自定义回复"
+		defaultText = "<{核心:骰子名字}>已在此群内关闭自定义回复！\n群内工作状态:{$t旧群内状态}-->关"
+	case "addgroup":
+		key = "骰子进群"
+		defaultText = "<{核心:骰子名字}> 已经就绪。可通过.help查看手册\n[图:data/images/sealdice.png]\nCOC/DND玩家可以使用.set coc/dnd在两种模式中切换\n已搭载自动重连，如遇风控不回可稍作等待"
+	case "addfriend":
+		key = "骰子成为好友"
+		defaultText = "<{核心:骰子名字}> 已经就绪。可通过.help查看手册，请拉群测试，私聊容易被企鹅吃掉。\n[图:data/images/sealdice.png]"
+	case "groupexitannounce":
+		key = "骰子退群预告"
+		defaultText = "收到指令，5s后将退出当前群组"
+	case "groupexit":
+		key = "骰子自动退群告别语"
+		defaultText = "由于长时间不使用，{核心:骰子名字}将退出本群，感谢您的使用。"
+	case "savesetup":
+		key = "骰子保存设置"
+		defaultText = "数据已保存"
+	case "additionalstatus":
+		key = "骰子状态附加文本"
+		defaultText = "供职于{$t供职群数}个群，其中{$t启用群数}个处于开启状态。{$t群内工作状态}"
+	case "reasonofrollprefix":
+		key = "骰点_原因"
+		defaultText = "由于{$t原因}，"
+	case "rolldiceeqvt":
+		key = "骰点_单项结果文本"
+		defaultText = "{$t表达式文本}{$t计算过程}={$t计算结果}"
+	case "rolldice":
+		key = "骰点"
+		defaultText = "{$t原因句子}{$t玩家}掷出了 {$t结果文本}"
+	case "rollmultidice":
+		key = "骰点_多轮"
+		defaultText = "{$t原因句子}{$t玩家}掷骰{$t次数}次:\n{$t结果文本}"
+	default:
+		return
+	}
+
+	if cmdNum == 1 || subval == "help" || subval == "default" {
+		text := DiceFormatReplyshow(val, ctx, "核心:"+key, defaultText)
+		ReplyToSender(ctx, msg, text)
+		return
+	}
+
+	if subval == "clr" || subval == "del" || subval == "default" {
+		for index := range d.TextMapRaw["核心"][key] {
+			d.TextMapRaw["核心"][key][index][0] = defaultText
+		}
+		SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
+		d.GenerateTextMap()
+		d.SaveText()
+		ReplyToSender(ctx, msg, fmt.Sprintf("已重置词条: %s", val))
+	} else {
+		srcText := strings.ReplaceAll(cmdArgs.RawArgs, cmdArgs.GetArgN(1), "")
+		srcText = strings.TrimSpace(srcText)
+		for index := range d.TextMapRaw["核心"][key] {
+			d.TextMapRaw["核心"][key][index][0] = srcText
+		}
+		SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
+		d.GenerateTextMap()
+		d.SaveText()
+		ReplyToSender(ctx, msg, fmt.Sprintf("已将词条: %s 设为: %s", val, srcText))
+	}
+}
+
+func handleCOCTextMapUpdate(ctx *MsgContext, msg *Message, val string, subval string, cmdArgs *CmdArgs, d *Dice) {
+	cmdNum := len(cmdArgs.Args)
+	var key, defaultText string
+	switch val {
+	case "setcocrule":
+		key = "设置房规_当前"
+		defaultText = "当前房规: {$t房规}\n{$t房规文本}"
+	case "fumble":
+		key = "判定_大失败"
+		defaultText = "大失败！"
+	case "failure":
+		key = "判定_失败"
+		defaultText = "失败！"
+	case "success":
+		key = "判定_成功_普通"
+		defaultText = "成功"
+	case "hardsuccess":
+		key = "判定_成功_困难"
+		defaultText = "困难成功"
+	case "extremesuccess":
+		key = "判定_成功_极难"
+		defaultText = "极难成功"
+	case "criticalsuccess":
+		key = "判定_大成功"
+		defaultText = "运气不错，大成功！"
+	case "musthardsuccess":
+		key = "判定_必须_困难_成功"
+		defaultText = "成功了！这要费点力气{$t附加判定结果}"
+	case "musthardfailure":
+		key = "判定_必须_困难_失败"
+		defaultText = "失败！还是有点难吧？{$t附加判定结果}"
+	case "mustextremesuccess":
+		key = "判定_必须_极难_成功"
+		defaultText = "居然成功了！运气不错啊！{$t附加判定结果}"
+	case "mustextremefailure":
+		key = "判定_必须_极难_失败"
+		defaultText = "失败了，不要太勉强自己{$t附加判定结果}"
+	case "mustcriticalsuccesssuccess":
+		key = "判定_必须_大成功_成功"
+		defaultText = "大成功！越过无数失败的命运，你握住了唯一的胜机！"
+	case "mustcriticalsuccessfailure":
+		key = "判定_必须_大成功_失败"
+		defaultText = "失败了，不出所料{$t附加判定结果}"
+	case "rollfumble":
+		key = "判定_简短_大失败"
+		defaultText = "大失败"
+	case "rollfailure":
+		key = "判定_简短_失败"
+		defaultText = "失败"
+	case "rollsuccess":
+		key = "判定_简短_成功_普通"
+		defaultText = "成功"
+	case "rollhardsuccess":
+		key = "判定_简短_成功_困难"
+		defaultText = "困难成功"
+	case "rollextremesuccess":
+		key = "判定_简短_成功_极难"
+		defaultText = "极难成功"
+	case "rollcriticalsuccess":
+		key = "判定_简短_大成功"
+		defaultText = "大成功"
+	case "rollchecktext":
+		key = "检定_单项结果文本"
+		defaultText = "{$t检定表达式文本}={$tD100}/{$t判定值}{$t检定计算过程} {$t判定结果}"
+	case "rollcheck":
+		key = "检定"
+		defaultText = `{$t原因 ? '由于' + $t原因 + '，'}{$t玩家}的"{$t属性表达式文本}"检定结果为: {$t结果文本}`
+	case "rollcheckmulti", "rollmulticheck":
+		key = "检定_多轮"
+		defaultText = `对{$t玩家}的"{$t属性表达式文本}"进行了{$t次数}次检定，结果为:\n{$t结果文本}`
+	default:
+		return
+	}
+
+	if cmdNum == 1 || subval == "help" || subval == "default" {
+		text := DiceFormatReplyshow(val, ctx, "COC:"+key, defaultText)
+		ReplyToSender(ctx, msg, text)
+		return
+	}
+
+	if subval == "clr" || subval == "del" || subval == "default" {
+		for index := range d.TextMapRaw["COC"][key] {
+			d.TextMapRaw["COC"][key][index][0] = defaultText
+		}
+		SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
+		d.GenerateTextMap()
+		d.SaveText()
+		ReplyToSender(ctx, msg, fmt.Sprintf("已重置词条: %s", val))
+	} else {
+		srcText := strings.ReplaceAll(cmdArgs.RawArgs, cmdArgs.GetArgN(1), "")
+		srcText = strings.TrimSpace(srcText)
+		for index := range d.TextMapRaw["COC"][key] {
+			d.TextMapRaw["COC"][key][index][0] = srcText
+		}
+		SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
+		d.GenerateTextMap()
+		d.SaveText()
+		ReplyToSender(ctx, msg, fmt.Sprintf("已将词条: %s 设为: %s", val, srcText))
+	}
+}
+
+func handleOtherTextMapUpdate(ctx *MsgContext, msg *Message, val string, subval string, cmdArgs *CmdArgs, d *Dice) {
+	cmdNum := len(cmdArgs.Args)
+	var key, defaultText string
+	switch val {
+	case "jrrp":
+		key = "今日人品"
+		defaultText = "{$t玩家} 今日人品为{$t人品}，{%\n    $t人品 > 95 ? '人品爆表！',\n    $t人品 > 80 ? '运气还不错！',\n    $t人品 > 50 ? '人品还行吧',\n    $t人品 > 10 ? '今天不太行',\n    1 ? '流年不利啊！'\n%}"
+	case "decklist":
+		key = "抽牌_列表"
+		defaultText = "{$t原始列表}"
+	case "drawkey":
+		key = "抽牌_列表"
+		defaultText = "{$t原始列表}"
+	case "nodeck":
+		key = "抽牌_列表_没有牌组"
+		defaultText = "呃，没有发现任何牌组"
+	case "deckcitenotfound":
+		key = "抽牌_找不到牌组"
+		defaultText = "找不到这个牌组"
+	case "deckcitenotfoundbuthavesimilar":
+		key = "抽牌_找不到牌组_存在类似"
+		defaultText = "未找到牌组，但发现一些相似的:"
+	case "deckspliter":
+		key = "抽牌_分隔符"
+		defaultText = `\n\n`
+	case "deckresultprefix":
+		key = "抽牌_结果前缀"
+		defaultText = ``
+	case "randomnamegenerate":
+		key = "随机名字"
+		defaultText = "为{$t玩家}生成以下名字：\n{$t随机名字文本}"
+	case "randomnamespliter":
+		key = "随机名字_分隔符"
+		defaultText = "、"
+	case "poke":
+		key = "戳一戳"
+		defaultText = "{核心:骰子名字}咕踊了一下"
+	case "ping":
+		key = "ping响应"
+		defaultText = "pong！这里是{核心:骰子名字}{$t请求结果}"
+	default:
+		return
+	}
+
+	if cmdNum == 1 || subval == "help" || subval == "default" {
+		text := DiceFormatReplyshow(val, ctx, "其它:"+key, defaultText)
+		ReplyToSender(ctx, msg, text)
+		return
+	}
+
+	if subval == "clr" || subval == "del" || subval == "default" {
+		for index := range d.TextMapRaw["其它"][key] {
+			d.TextMapRaw["其它"][key][index][0] = defaultText
+		}
+		SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
+		d.GenerateTextMap()
+		d.SaveText()
+		ReplyToSender(ctx, msg, fmt.Sprintf("已重置词条: %s", val))
+	} else {
+		srcText := strings.ReplaceAll(cmdArgs.RawArgs, cmdArgs.GetArgN(1), "")
+		srcText = strings.TrimSpace(srcText)
+		for index := range d.TextMapRaw["其它"][key] {
+			d.TextMapRaw["其它"][key][index][0] = srcText
+		}
+		SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
+		d.GenerateTextMap()
+		d.SaveText()
+		ReplyToSender(ctx, msg, fmt.Sprintf("已将词条: %s 设为: %s", val, srcText))
+	}
+}
+
+func handleLogTextMapUpdate(ctx *MsgContext, msg *Message, val string, subval string, cmdArgs *CmdArgs, d *Dice) {
+	cmdNum := len(cmdArgs.Args)
+	var key, defaultText string
+	switch val {
+	case "lognew":
+		key = "记录_新建"
+		defaultText = `新的故事开始了，祝旅途愉快！\n记录已经开启`
+	case "logon":
+		key = "记录_开启_成功"
+		defaultText = `故事"{$t记录名称}"的记录已经继续开启，当前已记录文本{$t当前记录条数}`
+	case "logonsuccess":
+		key = "记录_开启_成功"
+		defaultText = `故事"{$t记录名称}"的记录已经继续开启，当前已记录文本{$t当前记录条数}`
+	case "logonfailnolog":
+		key = "记录_开启_失败_无此记录"
+		defaultText = `无法继续，没能找到记录: {$t记录名称}`
+	case "logonfailnotnew":
+		key = "记录_开启_失败_尚未新建"
+		defaultText = `找不到记录，请使用.log new新建记录`
+	case "logonalready":
+		key = "记录_开启_失败_未结束的记录"
+		defaultText = `当前已有记录中的日志{$t记录名称}，请先将其结束。`
+	case "logonfailunfinished":
+		key = "记录_开启_失败_未结束的记录"
+		defaultText = `当前已有记录中的日志{$t记录名称}，请先将其结束。`
+	case "logoff":
+		key = "记录_关闭_成功"
+		defaultText = `当前记录"{$t记录名称}"已经暂停，已记录文本{$t当前记录条数}条\n结束故事并传送日志请用.log end`
+	case "logoffsuccess":
+		key = "记录_关闭_成功"
+		defaultText = `当前记录"{$t记录名称}"已经暂停，已记录文本{$t当前记录条数}条\n结束故事并传送日志请用.log end`
+	case "logofffail":
+		key = "记录_关闭_失败"
+		defaultText = `没有找到正在进行的记录，已经是关闭状态。这可能表示您忘记了开启记录。`
+	case "logexportnotcertainlog":
+		key = "记录_取出_未指定记录"
+		defaultText = `命令格式错误：当前没有开启状态的记录，或没有通过参数指定要取出的日志。请参考帮助。`
+	/*case "logrenamesuccess":
+		key = "记录_重命名_成功"
+		defaultText = `当前记录"{$t记录名称}"已重命名为"{$t新记录名称}"`
+	case "logrenamefailnoton":
+		key = "记录_重命名_失败_未开启记录"
+		defaultText = `没有找到正在进行的记录，已经是关闭状态，无法重命名`
+	case "logrenamenonewname":
+		key = "记录_重命名_未指定新名称"
+		defaultText = `命令格式错误：请提供新名称。`*/
+	case "loglistprefix":
+		key = "记录_列出_导入语"
+		defaultText = `正在列出存在于此群的记录:`
+	case "logend":
+		key = "记录_结束"
+		defaultText = `故事落下了帷幕。\n记录已经关闭。`
+	case "logendsuccess":
+		key = "记录_结束"
+		defaultText = `故事落下了帷幕。\n记录已经关闭。`
+	case "lognewbutunfinished":
+		key = "记录_新建_失败_未结束的记录"
+		defaultText = `上一段旅程{$t记录名称}还未结束，请先使用.log end结束故事。`
+	case "loglengthnotice":
+		key = "记录_条数提醒"
+		defaultText = `提示: 当前故事的文本已经记录了 {$t条数} 条`
+	case "logdelete":
+		key = "记录_删除_成功"
+		defaultText = "删除记录 {$t记录名称} 成功"
+	case "logdeletesuccess":
+		key = "记录_删除_成功"
+		defaultText = "删除记录 {$t记录名称} 成功"
+	case "logdeletefailnotfound":
+		key = "记录_删除_失败_找不到"
+		defaultText = "删除记录 {$t记录名称} 失败，可能是名字不对"
+	case "logdeletefailcontinuing":
+		key = "记录_删除_失败_正在进行"
+		defaultText = "记录 {$t记录名称} 正在进行，无法删除。请先用 log end 结束记录，如不希望上传请用 log halt。"
+	case "obenter":
+		key = "OB_开启"
+		defaultText = "你将成为观众（自动修改昵称和群名片[如有权限]，并不会给观众发送暗骰结果）。"
+	case "obexit":
+		key = "OB_关闭"
+		defaultText = "你不再是观众了（自动修改昵称和群名片[如有权限]）。"
+	case "logupload":
+		key = "记录_上传_成功"
+		defaultText = `跑团日志已上传服务器，链接如下：{$t日志链接}`
+	case "loguploadsuccess":
+		key = "记录_上传_成功"
+		defaultText = `跑团日志已上传服务器，链接如下：{$t日志链接}`
+	case "loguploadfail":
+		key = "记录_上传_失败"
+		defaultText = `跑团日志上传失败：{$t错误原因}\n若未出现线上日志地址，可换时间重试，或联系骰主在data/default/log-exports路径下取出日志\n文件名: 群号_日志名_随机数.zip\n注意此文件log end/get后才会生成`
+	case "logexport":
+		key = "记录_导出_成功"
+		defaultText = `日志文件《{$t文件名字}》已上传至群文件，请自行到群文件查看。`
+	case "logexportsuccess":
+		key = "记录_导出_成功"
+		defaultText = `日志文件《{$t文件名字}》已上传至群文件，请自行到群文件查看。`
+	case "syncname":
+		key = "名片_自动设置"
+		defaultText = `已自动设置名片格式为{$t名片格式}：{$t名片预览}\n如有权限会在属性更新时自动更新名片。使用.sn off可关闭。`
+	case "syncnamecancel":
+		key = "名片_取消设置"
+		defaultText = `已关闭对{$t玩家}的名片自动修改。`
+	default:
+		return
+	}
+
+	if cmdNum == 1 || subval == "help" || subval == "default" {
+		text := DiceFormatReplyshow(val, ctx, "日志:"+key, defaultText)
+		ReplyToSender(ctx, msg, text)
+		return
+	}
+
+	if subval == "clr" || subval == "del" || subval == "default" {
+		for index := range d.TextMapRaw["日志"][key] {
+			d.TextMapRaw["日志"][key][index][0] = defaultText
+		}
+		SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
+		d.GenerateTextMap()
+		d.SaveText()
+		ReplyToSender(ctx, msg, fmt.Sprintf("已重置词条: %s", val))
+	} else {
+		srcText := strings.ReplaceAll(cmdArgs.RawArgs, cmdArgs.GetArgN(1), "")
+		srcText = strings.TrimSpace(srcText)
+		for index := range d.TextMapRaw["日志"][key] {
+			d.TextMapRaw["日志"][key][index][0] = srcText
+		}
+		SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
+		d.GenerateTextMap()
+		d.SaveText()
+		ReplyToSender(ctx, msg, fmt.Sprintf("已将词条: %s 设为: %s", val, srcText))
+	}
+
+}
+func DiceFormatReplyshow(key string, ctx *MsgContext, s string, srcText string) string {
+	VarSetValueStr(ctx, "$t原因句子", "{$t原因句子}")
+	VarSetValueStr(ctx, "$t结果文本", "{$t结果文本}")
+	VarSetValueStr(ctx, "$t旧群内状态", "{$t旧群内状态}")
+	VarSetValueStr(ctx, "$t群内工作状态", "{$t群内工作状态}")
+	VarSetValueStr(ctx, "$t原因", "{$t原因}")
+	VarSetValueStr(ctx, "$t次数", "{$t次数}")
+	VarSetValueStr(ctx, "$t表达式文本", "{$t表达式文本}")
+	VarSetValueStr(ctx, "$t计算过程", "{$t计算过程}")
+	VarSetValueStr(ctx, "$t旧群内状态", "{$t旧群内状态}")
+	VarSetValueStr(ctx, "$t计算结果", "{$t计算结果}")
+	VarSetValueStr(ctx, "$t事发群名", "{$t事发群名}")
+	VarSetValueStr(ctx, "$t事发群号", "{$t事发群号}")
+	VarSetValueStr(ctx, "$t黑名单事件", "{$t黑名单事件}")
+	VarSetValueStr(ctx, "$t原始列表", "{$t原始列表}")
+	VarSetValueStr(ctx, "$t随机名字文本", "{$t随机名字文本}")
+	VarSetValueStr(ctx, "$t请求结果", "{$t请求结果}")
+	VarSetValueStr(ctx, "$t条数", "{$t条数}")
+	VarSetValueStr(ctx, "$t记录名称", "{$t记录名称}")
+	VarSetValueStr(ctx, "$t当前记录条数", "{$t当前记录条数}")
+	VarSetValueStr(ctx, "$t角色名", "{$t角色名}")
+	text := fmt.Sprintf("词条: %s\nwebui: %s\n默认: %s\n预览: %s", key, s, srcText, DiceFormatTmpl(ctx, s))
+	return text
+}
+func handleGuiMiTextMapUpdate(ctx *MsgContext, msg *Message, val string, subval string, cmdArgs *CmdArgs, d *Dice) {
+	cmdNum := len(cmdArgs.Args)
+	var key, defaultText string
+	switch val {
+	case "guimi", "guimibuild":
+		key = "制卡"
+		defaultText = "{$t玩家}的琉璃版诡秘3.0人物作成:\n{$t制卡结果文本}"
+	case "guimispliter":
+		key = "制卡_分隔符"
+		defaultText = "#{SPLIT}"
+	default:
+		return
+	}
+	if cmdNum == 1 || subval == "help" || subval == "default" {
+		text := DiceFormatReplyshow(val, ctx, "诡秘:"+key, defaultText)
+		ReplyToSender(ctx, msg, text)
+		return
+	}
+
+	if subval == "clr" || subval == "del" || subval == "default" {
+		for index := range d.TextMapRaw["诡秘"][key] {
+			d.TextMapRaw["诡秘"][key][index][0] = defaultText
+		}
+		SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
+		d.GenerateTextMap()
+		d.SaveText()
+		ReplyToSender(ctx, msg, fmt.Sprintf("已重置词条: %s", val))
+	} else {
+		srcText := strings.ReplaceAll(cmdArgs.RawArgs, cmdArgs.GetArgN(1), "")
+		srcText = strings.TrimSpace(srcText)
+		for index := range d.TextMapRaw["诡秘"][key] {
+			d.TextMapRaw["诡秘"][key][index][0] = srcText
+		}
+		SetupTextHelpInfo(d, d.TextMapHelpInfo, d.TextMapRaw, "configs/text-template.yaml")
+		d.GenerateTextMap()
+		d.SaveText()
+		ReplyToSender(ctx, msg, fmt.Sprintf("已将词条: %s 设为: %s", val, srcText))
+	}
+}
+
+func handleTextMapUpdate(ctx *MsgContext, msg *Message, val string, subval string, cmdArgs *CmdArgs, d *Dice) {
+	switch val {
+	case "selfname", "unknownerror", "boton", "botoff", "replyon", "replyoff", "addgroup", "addfriend", "groupexitannounce", "groupexit", "savesetup", "additionalstatus", "reasonofrollprefix", "rolldiceeqvt", "rolldice", "rollmultidice":
+		handleCoreTextMapUpdate(ctx, msg, val, subval, cmdArgs, d)
+	case "setcocrule", "fumble", "failure", "success", "hardsuccess", "extremesuccess", "criticalsuccess", "musthardsuccess", "musthardfailure", "mustextremesuccess", "mustextremefailure", "mustcriticalsuccesssuccess", "mustcriticalsuccessfailure", "rollfumble", "rollfailure", "rollsuccess", "rollhardsuccess", "rollextremesuccess", "rollcriticalsuccess", "rollchecktext", "rollcheck", "rollcheckmulti", "rollmulticheck":
+		handleCOCTextMapUpdate(ctx, msg, val, subval, cmdArgs, d)
+	case "jrrp", "decklist", "drawkey", "nodeck", "deckcitenotfound", "deckcitenotfoundbuthavesimilar", "deckspliter", "deckresultprefix", "randomnamegenerate", "randomnamespliter", "poke", "ping":
+		handleOtherTextMapUpdate(ctx, msg, val, subval, cmdArgs, d)
+	case "lognew", "logon", "logonsuccess", "logonfailnolog", "logonfailnotnew", "logonalready", "logonfailunfinished", "logoff", "logoffsuccess", "logofffail", "logexportnotcertainlog", "loglistprefix", "logend", "logendsuccess", "lognewbutunfinished", "loglengthnotice", "logdelete", "logdeletesuccess", "logdeletefailnotfound", "logdeletefailcontinuing", "obenter", "obexit", "logupload", "loguploadsuccess", "loguploadfail", "logexport", "logexportsuccess", "syncname", "syncnamecancel": //"logrenamesuccess", "logrenamefailnoton", "logrenamenonewname":
+		handleLogTextMapUpdate(ctx, msg, val, subval, cmdArgs, d)
+	case "guimi", "guimibuild", "guimispliter":
+		handleGuiMiTextMapUpdate(ctx, msg, val, subval, cmdArgs, d)
+	default:
+		return
+	}
+}
 
 func getCPUModel() string {
 	var cpuModel string
@@ -544,9 +1010,7 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 		Solve: func(ctx *MsgContext, msg *Message, cmdArgs *CmdArgs) CmdExecuteResult {
 			arg := cmdArgs.GetArgN(1)
 			if arg == "" {
-				text := "海豹核心 " + VERSION.String() + "\n"
-				text += "官网: sealdice.com" + "\n"
-				text += "海豹群: 524364253" + "\n"
+				text := "风暴核心 " + VERSION.String() + "\n"
 				text += DiceFormatTmpl(ctx, "核心:骰子帮助文本_附加说明")
 				ReplyToSender(ctx, msg, text)
 				return CmdExecuteResult{Matched: true, Solved: true}
@@ -622,8 +1086,8 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 
 	cmdBot := CmdItemInfo{
 		Name:      "bot",
-		ShortHelp: ".bot // 查看信息",
-		Help:      "骰子管理:\n.bot // 查看信息",
+		ShortHelp: ".bot // 查看信息\n.bot on/off // 开启、关闭",
+		Help:      "骰子管理:\n.bot // 查看信息\n.bot on/off // 开启、关闭",
 		Raw:       true,
 		Solve: func(ctx *MsgContext, msg *Message, cmdArgs *CmdArgs) CmdExecuteResult {
 			inGroup := msg.MessageType == "group"
@@ -639,6 +1103,44 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 				}
 			}
 			if cmdArgs.GetArgN(1) != "" {
+				if cmdArgs.IsArgEqual(1, "on") {
+					if !(ctx.Dice.BotExtFreeSwitch || ctx.PrivilegeLevel >= 40) {
+						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_无权限_非master/管理/邀请者"))
+						return CmdExecuteResult{Matched: true, Solved: true}
+					}
+
+					if ctx.IsPrivate {
+						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_私聊不可用"))
+						return CmdExecuteResult{Matched: true, Solved: true}
+					}
+
+					SetBotOnAtGroup(ctx, msg.GroupID)
+					// TODO：ServiceAtNew此处忽略是否合理？
+					ctx.Group, _ = ctx.Session.ServiceAtNew.Load(msg.GroupID)
+					ctx.IsCurGroupBotOn = true
+
+					text := DiceFormatTmpl(ctx, "核心:骰子开启")
+					if ctx.Group.LogOn {
+						text += "\n请特别注意: 日志记录处于开启状态"
+					}
+					ReplyToSender(ctx, msg, text)
+
+					return CmdExecuteResult{Matched: true, Solved: true}
+				} else if cmdArgs.IsArgEqual(1, "off") {
+					if !(ctx.Dice.BotExtFreeSwitch || ctx.PrivilegeLevel >= 40) {
+						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_无权限_非master/管理/邀请者"))
+						return CmdExecuteResult{Matched: true, Solved: true}
+					}
+
+					if ctx.IsPrivate {
+						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_私聊不可用"))
+						return CmdExecuteResult{Matched: true, Solved: true}
+					}
+
+					SetBotOffAtGroup(ctx, ctx.Group.GroupID)
+					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:骰子关闭"))
+					return CmdExecuteResult{Matched: true, Solved: true}
+				}
 				return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
 			} else {
 				text := "Tempest Dice ver" + VERSION.String() + " based on Go version " + AppGoVersion
@@ -744,7 +1246,7 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 				}
 
 				reply = fmt.Sprintf(
-					"新增标记了%d/%d个帐号，这些账号将被视为机器人。\n因此他们被人@，或主动发出指令时，海豹将不会回复。\n另外对于botlist add/rm，如果群里有多个海豹，只有第一个被@的会回复，其余的执行指令但不回应",
+					"新增标记了%d/%d个帐号，这些账号将被视为机器人。\n因此他们被人@，或主动发出指令时，风暴将不会回复。\n另外对于botlist add/rm，如果群里有多个风暴，只有第一个被@的会回复，其余的执行指令但不回应",
 					newCount, allCount,
 				)
 			case "del", "rm":
@@ -759,7 +1261,7 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 				}
 
 				reply = fmt.Sprintf(
-					"删除标记了%d/%d个帐号，这些账号将不再被视为机器人。\n海豹将继续回应他们的命令",
+					"删除标记了%d/%d个帐号，这些账号将不再被视为机器人。\n风暴将继续回应他们的命令",
 					existsCount, allCount,
 				)
 			case "list", "show":
@@ -885,7 +1387,7 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 					}
 				}
 				ctx.Dice.Save(false)
-				ReplyToSender(ctx, msg, fmt.Sprintf("海豹将新增%d位master", count))
+				ReplyToSender(ctx, msg, fmt.Sprintf("风暴将新增%d位master", count))
 			case "del", "rm":
 				var count int
 				for _, uid := range readIDList(ctx, msg, cmdArgs) {
@@ -894,7 +1396,7 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 					}
 				}
 				ctx.Dice.Save(false)
-				ReplyToSender(ctx, msg, fmt.Sprintf("海豹移除了%d名master", count))
+				ReplyToSender(ctx, msg, fmt.Sprintf("风暴移除了%d名master", count))
 			case "relogin":
 				var kw *Kwarg
 
@@ -952,86 +1454,8 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 					d.Logger.Error("骰子备份:", err)
 					ReplyToSender(ctx, msg, "备份失败！错误已写入日志。可能是磁盘已满所致，建议立即进行处理！")
 				}
-			case "checkupdate":
-				var dm = ctx.Dice.Parent
-				if dm.JustForTest {
-					ReplyToSender(ctx, msg, "此指令在展示模式下不可用")
-					return CmdExecuteResult{Matched: true, Solved: true}
-				}
-
-				if runtime.GOOS == "android" {
-					ReplyToSender(ctx, msg, "检测到手机版，手机版海豹不支持指令更新，请手动下载新版本安装包")
-					return CmdExecuteResult{Matched: true, Solved: true}
-				}
-
-				if dm.ContainerMode {
-					ReplyToSender(ctx, msg, "容器模式下禁止指令更新，请手动拉取最新镜像")
-					return CmdExecuteResult{Matched: true, Solved: true}
-				}
-
-				code := cmdArgs.GetArgN(2)
-				if code == "" {
-					var text string
-					dm.AppVersionOnline = nil
-					dm.UpdateCheckRequestChan <- 1
-
-					// 等待获取新版本，最多10s
-					for i := 0; i < 5; i++ {
-						time.Sleep(2 * time.Second)
-						if dm.AppVersionOnline != nil {
-							break
-						}
-					}
-
-					if dm.AppVersionOnline != nil {
-						text = fmt.Sprintf("当前本地版本为: %s\n当前线上版本为: %s", VERSION.String(), dm.AppVersionOnline.VersionLatestDetail)
-						if dm.AppVersionCode != dm.AppVersionOnline.VersionLatestCode {
-							updateCode = strconv.FormatInt(rand.Int63()%8999+1000, 10)
-							text += fmt.Sprintf("\n如需升级，请输入.master checkupdate %s 确认进行升级\n升级将花费约2分钟，升级失败可能导致进程关闭，建议在接触服务器情况下操作。\n当前进程启动时间: %s", updateCode, time.Unix(dm.AppBootTime, 0).Format("2006-01-02 15:04:05"))
-						}
-					} else {
-						text = fmt.Sprintf("当前本地版本为: %s\n当前线上版本为: %s", VERSION.String(), "未知")
-					}
-					ReplyToSender(ctx, msg, text)
-					break
-				}
-
-				if code != updateCode || updateCode == "0000" {
-					ReplyToSender(ctx, msg, "无效的升级指令码")
-					break
-				}
-
-				ReplyToSender(ctx, msg, "开始下载新版本，完成后将自动进行一次备份")
-				go func() {
-					ret := <-dm.UpdateDownloadedChan
-
-					if ctx.IsPrivate {
-						ctx.Dice.UpgradeWindowID = msg.Sender.UserID
-					} else {
-						ctx.Dice.UpgradeWindowID = ctx.Group.GroupID
-					}
-					ctx.Dice.UpgradeEndpointID = ctx.EndPoint.ID
-					ctx.Dice.Save(true)
-
-					bakFn, _ := ctx.Dice.Parent.Backup(BackupSelectionAll, false)
-					tmpPath := path.Join(os.TempDir(), bakFn)
-					_ = os.MkdirAll(tmpPath, 0755)
-					ctx.Dice.Logger.Infof("将备份文件复制到此路径: %s", tmpPath)
-					_ = cp.Copy(path.Join(BackupDir, bakFn), tmpPath)
-
-					if ret == "" {
-						ReplyToSender(ctx, msg, "准备开始升级，服务即将离线")
-					} else {
-						ReplyToSender(ctx, msg, "升级失败，原因: "+ret)
-					}
-				}()
-				dm.UpdateRequestChan <- d
 			case "reboot":
 				var dm = ctx.Dice.Parent
-				if dm.JustForTest {
-					ReplyToSender(ctx, msg, "此指令在展示模式下不可用")
-					return CmdExecuteResult{Matched: true, Solved: true}
-				}
 
 				code := cmdArgs.GetArgN(2)
 				if code == "" {
@@ -1573,7 +1997,7 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 		".pc save [<角色名>] // [不绑卡]保存角色，角色名可省略\n" +
 		".pc load (<角色名> | <角色序号>) // [不绑卡]加载角色\n" +
 		".pc del/rm (<角色名> | <角色序号>) // 删除角色 角色序号可用pc list查询\n" +
-		"> 注: 海豹各群数据独立(多张空白卡)，单群游戏不需要存角色。"
+		"> 注: 风暴各群数据独立(多张空白卡)，单群游戏不需要存角色。"
 
 	cmdChar := CmdItemInfo{
 		Name:      "pc",
@@ -1914,6 +2338,78 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 				}
 				ctx.Group.ExtInactiveByName("reply")
 				ReplyToSender(ctx, msg, fmt.Sprintf("已在当前群关闭自定义回复(%s➯关)。\n此指令等价于.ext reply off", onText))
+			case "lua":
+				if ctx.PrivilegeLevel < 100 {
+					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_无权限_非master"))
+					return CmdExecuteResult{Matched: true, Solved: true}
+				}
+				subval := cmdArgs.GetArgN(2)
+				switch strings.ToLower(subval) {
+				case "set", "+":
+					luaReplyAdd := func(d *Dice, key string, value string) {
+						// 获取文件路径
+						files, _ := filepath.Glob(d.GetExtDataDir("reply") + "/luareply.json")
+						if len(files) == 0 {
+							ReplyToSender(ctx, msg, "Lua 自定义回复列表为空,正在创建 luareply.json 自定义回复。")
+							file, _ := os.Create(d.GetExtDataDir("reply") + "/luareply.json")
+							file.WriteString("{}")
+							file.Close()
+							return
+						}
+
+						// 读取文件内容
+						data, _ := os.ReadFile(files[0])
+
+						// 解析 JSON 数据
+						var jsonData map[string]string
+						json.Unmarshal(data, &jsonData)
+
+						// 添加新的键值对
+						jsonData[key] = value
+
+						// 将更新后的 JSON 数据写回文件
+						updatedData, _ := json.MarshalIndent(jsonData, "", "  ")
+
+						os.WriteFile(files[0], updatedData, 0644)
+					}
+					code := strings.TrimSpace(strings.Replace(strings.Replace(strings.Replace(cmdArgs.RawArgs, "lua", "", 1), "set", "", 1), cmdArgs.GetArgN(3), "", 1))
+					luaReplyAdd(d, cmdArgs.GetArgN(3), code)
+					ReplyToSender(ctx, msg, "已添加 Lua 自定义回复: "+cmdArgs.GetArgN(3)+"\n"+code)
+					LuaReplyLoad(d)
+					return CmdExecuteResult{Matched: true, Solved: true}
+				case "del", "-":
+					luaReplyDel := func(d *Dice, key string) {
+						// 获取文件路径
+						files, _ := filepath.Glob(d.GetExtDataDir("reply") + "/luareply.json")
+						if len(files) == 0 {
+							ReplyToSender(ctx, msg, "Lua 自定义回复列表为空,正在创建 luareply.json 自定义回复。")
+							file, _ := os.Create(d.GetExtDataDir("reply") + "/luareply.json")
+							file.Close()
+							return
+						}
+
+						// 读取文件内容
+						data, _ := os.ReadFile(files[0])
+
+						// 解析 JSON 数据
+						var jsonData map[string]string
+						json.Unmarshal(data, &jsonData)
+
+						// 添加新的键值对
+						jsonData[key] = ""
+
+						// 将更新后的 JSON 数据写回文件
+						updatedData, _ := json.MarshalIndent(jsonData, "", "  ")
+
+						os.WriteFile(files[0], updatedData, 0644)
+					}
+					luaReplyDel(d, cmdArgs.GetArgN(3))
+					ReplyToSender(ctx, msg, "已删除 Lua 自定义回复: "+cmdArgs.GetArgN(3))
+					LuaReplyLoad(d)
+					return CmdExecuteResult{Matched: true, Solved: true}
+				default:
+					return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+				}
 			default:
 				return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
 			}
@@ -1981,6 +2477,24 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 		},
 	}
 
+	cmdStr := CmdItemInfo{
+		Name:      "str",
+		ShortHelp: ".str<条目名称> <回执内容>",
+		Help:      "打开或关闭自定义回复:\n.reply on/off",
+		Solve: func(ctx *MsgContext, msg *Message, cmdArgs *CmdArgs) CmdExecuteResult {
+			if ctx.PrivilegeLevel < 100 {
+				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_无权限_非master"))
+				return CmdExecuteResult{Matched: true, Solved: true}
+			}
+			val := cmdArgs.GetArgN(1)
+			val = strings.ToLower(val)
+			subval := cmdArgs.GetArgN(2)
+			subval = strings.ToLower(subval)
+			handleTextMapUpdate(ctx, msg, val, subval, cmdArgs, d)
+			return CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
+
 	d.RegisterExtension(&ExtInfo{
 		Name:            "core", // 扩展的名称，需要用于指令中，写简短点      2024.05.10: 目前被看成是 function 的缩写了（
 		Version:         "1.0.0",
@@ -2009,6 +2523,7 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 			"pc":      &cmdChar,
 			"reply":   &cmdReply,
 			"system":  &cmdSystem,
+			"str":     &cmdStr,
 		},
 	})
 }

@@ -137,10 +137,11 @@ func RegisterBuiltinExtReply(dice *Dice) {
 		Name:       "reply", // 扩展的名称，需要用于开启和关闭指令中，写简短点
 		Version:    "1.2.0",
 		Brief:      "自定义回复模块，支持各种文本匹配和简易脚本",
-		Author:     "木落",
+		Author:     "木落,海棠,星界之主",
 		AutoActive: true, // 是否自动开启
 		Official:   true,
 		OnNotCommandReceived: func(ctx *MsgContext, msg *Message) {
+			replyInitStartTime := time.Now().UnixMicro()
 			// 当前，只有非指令才会匹配
 			rcs := ctx.Dice.CustomReplyConfig
 			if !ctx.Dice.CustomReplyConfigEnable {
@@ -241,6 +242,8 @@ func RegisterBuiltinExtReply(dice *Dice) {
 					break
 				}
 			}
+			replyInitEndTime := time.Now().UnixMicro()
+			dice.Logger.Info(fmt.Sprintf("%s%d%s", "[回复调试] ds匹配结束，耗时: ", int((replyInitEndTime-replyInitStartTime)/1000), "毫秒\n"))
 		},
 		GetDescText: GetExtensionDesc,
 		CmdMap:      CmdMapCls{},

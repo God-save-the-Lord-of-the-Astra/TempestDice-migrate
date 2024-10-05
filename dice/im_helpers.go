@@ -164,7 +164,10 @@ func replyToSenderRawNoCheck(ctx *MsgContext, msg *Message, text string, flag st
 }
 
 func ReplyToSender(ctx *MsgContext, msg *Message, text string) {
+	ReplyToSenderStartTime := time.Now().UnixMicro()
 	go ReplyToSenderRaw(ctx, msg, text, "")
+	ReplyToSenderTime := time.Now().UnixMicro() - ReplyToSenderStartTime
+	ctx.Dice.Logger.Infof("ReplyToSender 耗时：%dus", ReplyToSenderTime)
 }
 
 func ReplyToSenderNoCheck(ctx *MsgContext, msg *Message, text string) {
@@ -243,7 +246,10 @@ func replyGroupRawNoCheck(ctx *MsgContext, msg *Message, text string, flag strin
 }
 
 func ReplyGroup(ctx *MsgContext, msg *Message, text string) {
+	ReplyGroupStartTime := time.Now().UnixMicro()
 	ReplyGroupRaw(ctx, msg, text, "")
+	ReplyGroupTime := time.Now().UnixMicro() - ReplyGroupStartTime
+	ctx.Dice.Logger.Infof("ReplyGroup 耗时：%dus", ReplyGroupTime)
 }
 
 func ReplyPersonRaw(ctx *MsgContext, msg *Message, text string, flag string) {
@@ -343,7 +349,10 @@ func CrossMsgBySearch(se *IMSession, p, t, txt string, pr bool) bool {
 // TODO: CrossMsgById 用指定 Id 的 EndPoint 发送跨平台消息，现在似乎没有这个需求
 
 func ReplyPerson(ctx *MsgContext, msg *Message, text string) {
+	ReplyPersonStartTime := time.Now().UnixMicro()
 	ReplyPersonRaw(ctx, msg, text, "")
+	ReplyPersonTime := time.Now().UnixMicro() - ReplyPersonStartTime
+	ctx.Dice.Logger.Infof("ReplyPerson 耗时：%dus", ReplyPersonTime)
 }
 
 func SendFileToSenderRaw(ctx *MsgContext, msg *Message, path string, flag string) {
@@ -370,59 +379,101 @@ func SendFileToGroupRaw(ctx *MsgContext, msg *Message, path string, flag string)
 }
 
 func MemberBan(ctx *MsgContext, groupID string, userID string, duration int64) {
+	MemberBanStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.MemberBan(groupID, userID, duration)
+	MemberBanTime := time.Now().UnixMicro() - MemberBanStartTime
+	ctx.Dice.Logger.Infof("MemberBan 耗时：%dus", MemberBanTime)
 }
 
 func MemberUnban(ctx *MsgContext, groupID string, userID string) {
+	MemberUnbanStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.MemberUnban(groupID, userID)
+	MemberUnbanTime := time.Now().UnixMicro() - MemberUnbanStartTime
+	ctx.Dice.Logger.Infof("MemberBan 耗时：%dus", MemberUnbanTime)
 }
 
 func MemberWholeBan(ctx *MsgContext, groupID string, enable bool) {
+	MemberWholeBanStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.MemberWholeBan(groupID, enable)
+	MemberWholeBanTime := time.Now().UnixMicro() - MemberWholeBanStartTime
+	ctx.Dice.Logger.Infof("MemberWholeBan 耗时：%dus", MemberWholeBanTime)
 }
 
 func MemberKick(ctx *MsgContext, groupID string, userID string) {
+	MemberKickStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.MemberKick(groupID, userID)
+	MemberKickTime := time.Now().UnixMicro() - MemberKickStartTime
+	ctx.Dice.Logger.Infof("MemberKick 耗时：%dus", MemberKickTime)
 }
 
 func GetGroupInfoAsync(ctx *MsgContext, groupID string) {
+	GetGroupInfoStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.GetGroupInfoAsync(groupID)
+	GetGroupInfoTime := time.Now().UnixMicro() - GetGroupInfoStartTime
+	ctx.Dice.Logger.Infof("GetGroupInfo 耗时：%dus", GetGroupInfoTime)
 }
 
 func DeleteFriend(ctx *MsgContext, id string) {
+	DeleteFriendStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.DeleteFriend(ctx, id)
+	DeleteFriendTime := time.Now().UnixMicro() - DeleteFriendStartTime
+	ctx.Dice.Logger.Infof("DeleteFriend 耗时：%dus", DeleteFriendTime)
 }
 
 func EditMessage(ctx *MsgContext, msgID string, message string) {
+	EditMessageStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.EditMessage(ctx, msgID, message)
+	EditMessageTime := time.Now().UnixMicro() - EditMessageStartTime
+	ctx.Dice.Logger.Infof("EditMessage 耗时：%dus", EditMessageTime)
 }
 
 func RecallMessage(ctx *MsgContext, msgID string) {
+	RecallMessageStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.RecallMessage(ctx, msgID)
+	RecallMessageTime := time.Now().UnixMicro() - RecallMessageStartTime
+	ctx.Dice.Logger.Infof("RecallMessage 耗时：%dus", RecallMessageTime)
 }
 
-func SendToGroupNotice(ctx *MsgContext, groupID string, content string) { //不知道为什么暂时不能用
+func SendToGroupNotice(ctx *MsgContext, groupID string, content string) {
+	SendToGroupNoticeStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.SendToGroupNotice(ctx, groupID, content)
+	SendToGroupNoticeTime := time.Now().UnixMicro() - SendToGroupNoticeStartTime
+	ctx.Dice.Logger.Infof("SendToGroupNotice 耗时：%dus", SendToGroupNoticeTime)
 }
 
 func SendLike(ctx *MsgContext, UserID string, times int) {
+	SendLikeStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.SendLike(ctx, UserID, times)
+	SendLikeTime := time.Now().UnixMicro() - SendLikeStartTime
+	ctx.Dice.Logger.Infof("SendLike 耗时：%dus", SendLikeTime)
 }
 
 func SetGroupAdmin(ctx *MsgContext, groupID string, userID string, enable bool) {
+	SetGroupAdminStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.SetGroupAdmin(ctx, groupID, userID, enable)
+	SetGroupAdminTime := time.Now().UnixMicro() - SetGroupAdminStartTime
+	ctx.Dice.Logger.Infof("SetGroupAdmin 耗时：%dus", SetGroupAdminTime)
 }
 
 func SetGroupName(ctx *MsgContext, groupID string, name string) {
+	SetGroupNameStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.SetGroupName(ctx, groupID, name)
+	SetGroupNameTime := time.Now().UnixMicro() - SetGroupNameStartTime
+	ctx.Dice.Logger.Infof("SetGroupName 耗时：%dus", SetGroupNameTime)
 }
 
 func SetGroupSpecialTitle(ctx *MsgContext, groupID string, userID string, specialTitle string) {
+	SetGroupSpecialTitleStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.SetGroupSpecialTitle(ctx, groupID, userID, specialTitle)
+	SetGroupSpecialTitleTime := time.Now().UnixMicro() - SetGroupSpecialTitleStartTime
+	ctx.Dice.Logger.Infof("SetGroupSpecialTitle 耗时：%dus", SetGroupSpecialTitleTime)
 }
 
 func SetSelfLongNick(ctx *MsgContext, longNick string) {
+	SetSelfLongNickStartTime := time.Now().UnixMicro()
 	ctx.EndPoint.Adapter.SetSelfLongNick(ctx, longNick)
+	SetSelfLongNickTime := time.Now().UnixMicro() - SetSelfLongNickStartTime
+	ctx.Dice.Logger.Infof("SetSelfLongNick 耗时：%dus", SetSelfLongNickTime)
 }
 
 func SharePeer(ctx *MsgContext, groupID string, userID string) {

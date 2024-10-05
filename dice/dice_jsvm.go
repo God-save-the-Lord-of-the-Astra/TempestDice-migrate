@@ -17,6 +17,8 @@ import (
 	"sync"
 	"time"
 
+	//"github.com/fsnotify/fsnotify"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
