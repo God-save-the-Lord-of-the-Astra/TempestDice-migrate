@@ -29,6 +29,7 @@ func (d *Dice) RegisterBuiltinExt() {
 	RegisterBuiltinMdiceCommands(d)
 	RegisterBuiltinShikiCommands(d)
 
+	RegisterExecCodeCommands(d)
 	RegisterBuiltinLuaReply(d)
 
 	d.RegisterBuiltinSystemTemplate()

@@ -2372,8 +2372,16 @@ func RegisterBuiltinCoreCommands(d *Dice) {
 
 						os.WriteFile(files[0], updatedData, 0644)
 					}
+					kw := ""
+					if cmdArgs.GetArgN(3) == "" {
+						return CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+					} else if strings.HasPrefix(cmdArgs.GetArgN(3), "regexp=") {
+						kw = strings.Replace(cmdArgs.GetArgN(3), "regexp=", "", 1)
+					} else {
+						kw = cmdArgs.GetArgN(3)
+					}
 					code := strings.TrimSpace(strings.Replace(strings.Replace(strings.Replace(cmdArgs.RawArgs, "lua", "", 1), "set", "", 1), cmdArgs.GetArgN(3), "", 1))
-					luaReplyAdd(d, cmdArgs.GetArgN(3), code)
+					luaReplyAdd(d, kw, code)
 					ReplyToSender(ctx, msg, "已添加 Lua 自定义回复: "+cmdArgs.GetArgN(3)+"\n"+code)
 					LuaReplyLoad(d)
 					return CmdExecuteResult{Matched: true, Solved: true}

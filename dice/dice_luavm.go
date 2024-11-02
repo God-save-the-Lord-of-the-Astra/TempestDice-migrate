@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"reflect"
 	"sort"
 	"strconv"
@@ -698,20 +699,20 @@ func luaShikiSendMsg(LuaVM *lua.LState) int {
 	ctx := LuaVM.CheckUserData(1).Value.(*MsgContext)
 	msg := LuaVM.CheckUserData(2).Value.(*Message)
 	text := LuaVM.CheckString(3)
-	msg_fromGroup := LuaVM.CheckString(4)
-	msg_fromQQ := LuaVM.CheckString(5)
-	if msg_fromQQ == "" {
-		msg_fromQQ = ctx.Player.UserID
+	magFromGroup := LuaVM.CheckString(4)
+	magFromQQ := LuaVM.CheckString(5)
+	if magFromQQ == "" {
+		magFromQQ = ctx.Player.UserID
 	}
-	if msg_fromGroup != "" && strings.HasPrefix(msg_fromGroup, "QQ-Group:") == false {
-		msg_fromGroup = fmt.Sprintf("%s%s", "QQ-Group:", msg_fromGroup)
+	if magFromGroup != "" && strings.HasPrefix(magFromGroup, "QQ-Group:") == false {
+		magFromGroup = fmt.Sprintf("%s%s", "QQ-Group:", magFromGroup)
 	}
-	if strings.HasPrefix(msg_fromQQ, "QQ:") == false {
-		msg_fromQQ = fmt.Sprintf("%s%s", "QQ:", msg_fromQQ)
+	if strings.HasPrefix(magFromQQ, "QQ:") == false {
+		magFromQQ = fmt.Sprintf("%s%s", "QQ:", magFromQQ)
 	}
-	msg.Sender.UserID = msg_fromQQ
-	msg.GroupID = msg_fromGroup
-	if msg_fromGroup == "" {
+	msg.Sender.UserID = magFromQQ
+	msg.GroupID = magFromGroup
+	if magFromGroup == "" {
 		ctx.IsPrivate = true
 		msg.MessageType = "private"
 		msg.Time = int64(time.Now().Unix())
@@ -722,6 +723,226 @@ func luaShikiSendMsg(LuaVM *lua.LState) int {
 		ctx.Group, ctx.Player = GetPlayerInfoBySender(ctx, msg)
 		ReplyGroup(ctx, msg, text)
 	}
+	return 1 // 返回 1 表示成功
+}
+
+func luaShikiSetGroupConf(LuaVM *lua.LState) int {
+	groupID := LuaVM.CheckString(1)
+	key := LuaVM.CheckString(2)
+	dice := LuaVM.CheckUserData(3).Value.(*Dice)
+	value := LuaVM.Get(4)
+	luaType := ""
+	if groupID == "" {
+		return 0 // 返回 0 表示失败
+	} else if strings.HasPrefix(groupID, "QQ-Group:") == false {
+		groupID = fmt.Sprintf("%s%s", "QQ-Group:", groupID)
+	}
+	if value.Type() == lua.LTString {
+		luaType = "string"
+	} else if value.Type() == lua.LTNumber {
+		luaType = "number"
+	} else if value.Type() == lua.LTBool {
+		luaType = "bool"
+	} else {
+		return 0 // 返回 0 表示失败
+	}
+	dice.shikiSetGroupConfig(groupID, key, luaType, value)
+	return 1 // 返回 1 表示成功
+}
+
+func luaShikiGetGroupConf(LuaVM *lua.LState) int {
+	groupID := LuaVM.CheckString(1)
+	key := LuaVM.CheckString(2)
+	dice := LuaVM.CheckUserData(3).Value.(*Dice)
+	if groupID == "" {
+		return 0 // 返回 0 表示失败
+	} else if strings.HasPrefix(groupID, "QQ-Group:") == false {
+		groupID = fmt.Sprintf("%s%s", "QQ-Group:", groupID)
+	}
+	Type, value := dice.shikiGetGroupConfig(groupID, key)
+	if Type == "" {
+		return 0 // 返回 0 表示失败
+	}
+	if Type == "string" {
+		LuaVM.Push(lua.LString(value.(string)))
+	} else if Type == "number" {
+		LuaVM.Push(lua.LNumber(value.(float64)))
+	} else if Type == "bool" {
+		LuaVM.Push(lua.LBool(value.(bool)))
+	}
+
+	return 1 // 返回 1 表示成功
+}
+
+func luaShikiSetUserConf(LuaVM *lua.LState) int {
+	userID := LuaVM.CheckString(1)
+	key := LuaVM.CheckString(2)
+	dice := LuaVM.CheckUserData(3).Value.(*Dice)
+	value := LuaVM.Get(4)
+	luaType := ""
+	if userID == "" {
+		return 0 // 返回 0 表示失败
+	} else if strings.HasPrefix(userID, "QQ:") == false {
+		userID = fmt.Sprintf("%s%s", "QQ:", userID)
+	}
+	if value.Type() == lua.LTString {
+		luaType = "string"
+	} else if value.Type() == lua.LTNumber {
+		luaType = "number"
+	} else if value.Type() == lua.LTBool {
+		luaType = "bool"
+	} else {
+		return 0 // 返回 0 表示失败
+	}
+	dice.shikiSetUserConfig(userID, key, luaType, value)
+	return 1 // 返回 1 表示成功
+}
+
+func luaShikiGetUserConf(LuaVM *lua.LState) int {
+	userID := LuaVM.CheckString(1)
+	key := LuaVM.CheckString(2)
+	dice := LuaVM.CheckUserData(3).Value.(*Dice)
+	if userID == "" {
+		return 0 // 返回 0 表示失败
+	} else if strings.HasPrefix(userID, "QQ:") == false {
+		userID = fmt.Sprintf("%s%s", "QQ:", userID)
+	}
+	Type, value := dice.shikiGetUserConfig(userID, key)
+	if Type == "" {
+		return 0 // 返回 0 表示失败
+	}
+	if Type == "string" {
+		LuaVM.Push(lua.LString(value.(string)))
+	} else if Type == "number" {
+		LuaVM.Push(lua.LNumber(value.(float64)))
+	} else if Type == "bool" {
+		LuaVM.Push(lua.LBool(value.(bool)))
+	}
+
+	return 1 // 返回 1 表示成功
+}
+
+func luaShikiGetDiceID(LuaVM *lua.LState) int {
+	ctx := LuaVM.CheckUserData(1).Value.(*MsgContext)
+	LuaVM.Push(lua.LString(ctx.EndPoint.ID))
+	return 1 // 返回 1 表示成功
+}
+
+func luaShikiLoadLuaFile(LuaVM *lua.LState) int {
+	path := LuaVM.CheckString(1)
+	d := LuaVM.CheckUserData(2).Value.(*Dice)
+	ctx := LuaVM.CheckUserData(3).Value.(*MsgContext)
+	msg := LuaVM.CheckUserData(4).Value.(*Message)
+	cmdArgs := LuaVM.CheckUserData(5).Value.(*CmdArgs)
+
+	L := lua.NewState()
+	defer L.Close()
+
+	//初始化lua全局变量
+	LuaVarInit(L, d, ctx, msg, cmdArgs)
+	//初始化lua全局函数
+	LuaFuncInit(L)
+
+	if err := L.DoFile(path); err != nil {
+		LuaVM.Push(lua.LNil)
+		LuaVM.Push(lua.LString(err.Error()))
+		return 0
+	}
+
+	return 1 // 返回 1 表示成功
+}
+
+func luaShikiLoadLuaString(LuaVM *lua.LState) int {
+	code := LuaVM.CheckString(1)
+	d := LuaVM.CheckUserData(2).Value.(*Dice)
+	ctx := LuaVM.CheckUserData(3).Value.(*MsgContext)
+	msg := LuaVM.CheckUserData(4).Value.(*Message)
+	cmdArgs := LuaVM.CheckUserData(5).Value.(*CmdArgs)
+
+	L := lua.NewState()
+	defer L.Close()
+
+	//初始化lua全局变量
+	LuaVarInit(L, d, ctx, msg, cmdArgs)
+	//初始化lua全局函数
+	LuaFuncInit(L)
+
+	if err := L.DoString(code); err != nil {
+		LuaVM.Push(lua.LNil)
+		LuaVM.Push(lua.LString(err.Error()))
+		return 0
+	}
+
+	return 1 // 返回 1 表示成功
+}
+
+func luaShikiHTTPGet(LuaVM *lua.LState) int {
+	url := LuaVM.CheckString(1)
+	resp, err := http.Get(url)
+	if err != nil {
+		LuaVM.Push(lua.LNil)
+		LuaVM.Push(lua.LString(err.Error()))
+		return 2
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		LuaVM.Push(lua.LNil)
+		LuaVM.Push(lua.LString(err.Error()))
+		return 2
+	}
+	LuaVM.Push(lua.LString(body))
+	return 1 // 返回 1 表示成功
+}
+
+func luaShikiHTTPPost(LuaVM *lua.LState) int {
+	url := LuaVM.CheckString(1)
+	contentType := LuaVM.CheckString(2)
+	body := LuaVM.CheckString(3)
+	resp, err := http.Post(url, contentType, strings.NewReader(body))
+	if err != nil {
+		LuaVM.Push(lua.LNil)
+		LuaVM.Push(lua.LString(err.Error()))
+		return 2
+	}
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		LuaVM.Push(lua.LNil)
+		LuaVM.Push(lua.LString(err.Error()))
+		return 2
+	}
+	LuaVM.Push(lua.LString(respBody))
+	return 1 // 返回 1 表示成功
+}
+
+func luaShikiHTTPRequest(LuaVM *lua.LState) int {
+	method := LuaVM.CheckString(1)
+	url := LuaVM.CheckString(2)
+	contentType := LuaVM.CheckString(3)
+	body := LuaVM.CheckString(4)
+	client := &http.Client{}
+	req, err := http.NewRequest(method, url, strings.NewReader(body))
+	if err != nil {
+		LuaVM.Push(lua.LNil)
+		LuaVM.Push(lua.LString(err.Error()))
+		return 2
+	}
+	req.Header.Set("Content-Type", contentType)
+	resp, err := client.Do(req)
+	if err != nil {
+		LuaVM.Push(lua.LNil)
+		LuaVM.Push(lua.LString(err.Error()))
+		return 2
+	}
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		LuaVM.Push(lua.LNil)
+		LuaVM.Push(lua.LString(err.Error()))
+		return 2
+	}
+	LuaVM.Push(lua.LString(respBody))
 	return 1 // 返回 1 表示成功
 }
 
@@ -1181,101 +1402,6 @@ func luaZhaoDiceSDKContains(L *lua.LState) int {
 	return 1
 }
 
-// ----------------------------------------------------------------
-
-func luaNewCmdItemInfo(LuaVM *lua.LState) int {
-	name := LuaVM.ToString(1)
-	author := LuaVM.ToString(2)
-	version := LuaVM.ToString(3)
-	official := LuaVM.ToBool(4)
-	extInfo := &ExtInfo{
-		Name:       name,
-		Author:     author,
-		Version:    version,
-		AutoActive: true,
-		IsJsExt:    false,
-		Brief:      "一个Lua自定义扩展",
-		Official:   official,
-		CmdMap:     CmdMapCls{},
-		OnCommandReceived: func(ctx *MsgContext, msg *Message, cmdArgs *CmdArgs) {
-		},
-		OnLoad: func() {
-		},
-		GetDescText: GetExtensionDesc,
-	}
-	extInfoUD := LuaVM.NewUserData()
-	extInfoUD.Value = extInfo
-	LuaVM.Push(extInfoUD)
-	return 1
-}
-
-func luaFind(LuaVM *lua.LState) int {
-	d := LuaVM.CheckUserData(1).Value.(*Dice)
-	name := LuaVM.ToString(2)
-	extInfoUD := d.ExtFind(name)
-	ud := LuaVM.NewUserData()
-	ud.Value = extInfoUD
-	LuaVM.Push(ud)
-	return 1
-}
-
-var extLuaPluginrunner *CmdItemInfo
-
-func luaRegister(LuaVM *lua.LState) int {
-	d := LuaVM.CheckUserData(1).Value.(*Dice)
-	extInfo := LuaVM.CheckUserData(2).Value.(*ExtInfo)
-	extKeyWord := LuaVM.CheckString(3)
-
-	defer func() {
-		if e := recover(); e != nil {
-			d.Logger.Error(e)
-		}
-	}()
-	d.RegisterExtension(extInfo)
-	if extInfo.OnLoad != nil {
-		extInfo.OnLoad()
-	}
-	d.ApplyExtDefaultSettings()
-	extInfo.CmdMap = CmdMapCls{extKeyWord: extLuaPluginrunner}
-	d.ImSession.ServiceAtNew.Range(func(key string, groupInfo *GroupInfo) bool {
-		groupInfo.ExtActive(extInfo)
-		return true
-	})
-	return 0
-}
-
-//----------------------------------------------------------------
-
-/*
-	func luaShikiEventMsg(LuaVM *lua.LState) int {
-		ctx := LuaVM.CheckUserData(1).Value.(*MsgContext)
-		msg := LuaVM.CheckUserData(2).Value.(*Message)
-		cmdArgs := LuaVM.CheckUserData(3).Value.(*CmdArgs)
-		text := LuaVM.CheckString(4)
-		msg_fromGroup := LuaVM.CheckString(5)
-		msg_fromQQ := LuaVM.CheckString(6)
-		if msg_fromGroup != "" && strings.HasPrefix(msg_fromGroup, "QQ-Group:") == false {
-			msg_fromGroup = fmt.Sprintf("%s%s", "QQ-Group:", msg_fromGroup)
-		}
-		if strings.HasPrefix(msg_fromQQ, "QQ:") == false {
-			msg_fromQQ = fmt.Sprintf("%s%s", "QQ:", msg_fromQQ)
-		}
-		msg.Sender.UserID = msg_fromQQ
-		msg.GroupID = msg_fromGroup
-		if msg_fromGroup == "" {
-			ctx.IsPrivate = true
-			msg.MessageType = "private"
-			msg.Time = int64(time.Now().Unix())
-			ctx.Group, ctx.Player = GetPlayerInfoBySender(ctx, msg)
-		} else {
-			msg.Time = int64(time.Now().Unix())
-			ctx.Group, ctx.Player = GetPlayerInfoBySender(ctx, msg)
-		}
-
-		return 1 // 返回 1 表示成功
-	}
-*/
-
 func LuaFuncInit(LuaVM *lua.LState) {
 	LuaVM.SetGlobal("VarSetValueStr", LuaVM.NewFunction(luaVarSetValueStr))
 	LuaVM.SetGlobal("VarSetValueInt", LuaVM.NewFunction(luaVarSetValueInt))
@@ -1301,14 +1427,18 @@ func LuaFuncInit(LuaVM *lua.LState) {
 	LuaVM.SetGlobal("SetSelfLongNick", LuaVM.NewFunction(luaSetSelfLongNick))
 	LuaVM.SetGlobal("DiceFormat", LuaVM.NewFunction(luaDiceFormat))
 	LuaVM.SetGlobal("DiceFormatTmpl", LuaVM.NewFunction(luaDiceFormatTmpl))
-	// ----------------------------------------------------------------
-	luaExtTable := LuaVM.NewTable()
-	LuaVM.SetField(luaExtTable, "newCmdItemInfo", LuaVM.NewFunction(luaNewCmdItemInfo))
-	LuaVM.SetField(luaExtTable, "find", LuaVM.NewFunction(luaFind))
-	LuaVM.SetField(luaExtTable, "register", LuaVM.NewFunction(luaRegister))
-	LuaVM.SetGlobal("ext", luaExtTable)
-	// ----------------------------------------------------------------
 	LuaVM.SetGlobal("shikisendMsg", LuaVM.NewFunction(luaShikiSendMsg))
+	LuaVM.SetGlobal("shikisetGroupConf", LuaVM.NewFunction(luaShikiSetGroupConf))
+	LuaVM.SetGlobal("shikigetGroupConf", LuaVM.NewFunction(luaShikiGetGroupConf))
+	LuaVM.SetGlobal("shikisetUserConf", LuaVM.NewFunction(luaShikiSetUserConf))
+	LuaVM.SetGlobal("shikigetUserConf", LuaVM.NewFunction(luaShikiGetUserConf))
+	LuaVM.SetGlobal("shikigetDiceID", LuaVM.NewFunction(luaShikiGetDiceID))
+	LuaVM.SetGlobal("shikiloadLuaFile", LuaVM.NewFunction(luaShikiLoadLuaFile))
+	LuaVM.SetGlobal("shikiloadLuaString", LuaVM.NewFunction(luaShikiLoadLuaString))
+	LuaVM.SetGlobal("shikiHttpGet", LuaVM.NewFunction(luaShikiHTTPGet))
+	LuaVM.SetGlobal("shikiHttpPost", LuaVM.NewFunction(luaShikiHTTPPost))
+	LuaVM.SetGlobal("shikiHttpRequest", LuaVM.NewFunction(luaShikiHTTPRequest))
+
 	//----------------------------------------------------------------
 	DreamLib := LuaVM.NewTable()
 	DreamLib.RawSetString("_VERSION", lua.LString("ver4.9.6(206)"))

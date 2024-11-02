@@ -362,11 +362,12 @@ func RegisterBuiltinShikiCommands(d *Dice) {
 			return CmdExecuteResult{Matched: true, Solved: true}
 		},
 	}
-	HelpForShikiAdminNotceAdd := ""
-	HelpForShikiAdminNotceDel := ""
-	HelpForShikiAdminNoticeClr := ""
-	HelpForShikiAdminNotceList := ""
-	HelpForShikiAdmin := "" + HelpForShikiAdminNotceAdd + "\n" + HelpForShikiAdminNotceDel + "\n" + HelpForShikiAdminNoticeClr + "\n" + HelpForShikiAdminNotceList
+	HelpForShikiAdminBrief := ".admin notice add/del/clr/list // 管理通知列表"
+	HelpForShikiAdminNotceAdd := ".admin notice add g+<群号>/p+<QQ号> // 将指定窗口加入通知列表"
+	HelpForShikiAdminNotceDel := ".admin notice del g+<群号>/p+<QQ号> // 将指定窗口移出通知列表"
+	HelpForShikiAdminNoticeClr := ".admin notice clr // 清空通知列表"
+	HelpForShikiAdminNotceList := ".admin notice list // 查看通知列表"
+	HelpForShikiAdmin := HelpForShikiAdminBrief + "\n" + HelpForShikiAdminNotceAdd + "\n" + HelpForShikiAdminNotceDel + "\n" + HelpForShikiAdminNoticeClr + "\n" + HelpForShikiAdminNotceList
 	HelpForShikiAdminNotce := ""
 	cmdShikiAdmin := CmdItemInfo{
 		Name:      "Dice!Admin",

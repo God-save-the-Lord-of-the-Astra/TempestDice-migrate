@@ -28,12 +28,9 @@ type PlatformAdapter interface {
 	// DeleteFriend 删除好友，目前只有 QQ 平台下的 gocq 和 walleq 实现有这个方法
 	DeleteFriend(ctx *MsgContext, id string)
 
-	// EditMessage replace the content of the message with msgID with message.
-	// Context is retrieved from ctx.
 	EditMessage(ctx *MsgContext, msgID string, message string)
-	// RecallMessage recalls the message with msgID. Context is retrieved from ctx.
 	RecallMessage(ctx *MsgContext, msgID string)
-	SendToGroupNotice(ctx *MsgContext, groupID string, content string) //暂时不能用
+	SendToGroupNotice(ctx *MsgContext, groupID string, content string)
 	SendLike(ctx *MsgContext, userID string, times int)
 	SetGroupAdmin(ctx *MsgContext, groupID string, userID string, enable bool)
 	SetGroupName(ctx *MsgContext, groupID string, groupName string)

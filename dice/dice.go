@@ -155,6 +155,13 @@ type BlackServerListWithWeight struct {
 	ServerWeight int    `yaml:"server_weight" json:"server_weight"` // 云黑服务器权重
 }
 
+type GitHubSubscribeInfo struct {
+	repoUrl   string
+	owner     string
+	repoAlias string
+	lastSHA   string
+}
+
 func (x ExtDefaultSettingItemSlice) Len() int           { return len(x) }
 func (x ExtDefaultSettingItemSlice) Less(i, _ int) bool { return x[i].Name == "coc7" }
 func (x ExtDefaultSettingItemSlice) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
@@ -206,6 +213,7 @@ type Dice struct {
 	ReplyDebugMode          bool                        `yaml:"replyDebugMode"`       // 回复调试
 	PlayerNameWrapEnable    bool                        `yaml:"playerNameWrapEnable"` // 启用玩家名称外框
 	BlackServerList         []BlackServerListWithWeight `yaml:"blackServer"`          // 云黑服务器列表
+	GitHubSubscribeList     []GitHubSubscribeInfo       `yaml:"githubSubscribe"`      // Github订阅
 
 	RateLimitEnabled         bool       `yaml:"rateLimitEnabled"`      // 启用频率限制 (刷屏限制)
 	PersonalReplenishRateStr string     `yaml:"personalReplenishRate"` // 个人刷屏警告速率，字符串格式
