@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 	"time"
 
@@ -22,11 +21,7 @@ func LuaReplyLoad(d *Dice) {
 	defaultLuaReplyExist := false
 	var filename string
 	for _, file := range files {
-		if runtime.GOOS == "windows" {
-			filename = "\\luareply.json"
-		} else {
-			filename = "/luareply.json"
-		}
+		filename = "/luareply.json"
 		if file == d.GetExtDataDir("reply")+filename {
 			defaultLuaReplyExist = true
 		}
