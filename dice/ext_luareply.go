@@ -56,7 +56,7 @@ func RegisterBuiltinLuaReply(d *Dice) {
 		Author:     "海棠",
 		AutoActive: true,
 		Official:   true,
-		OnMessageReceived: func(ctx *MsgContext, msg *Message) {
+		OnNotCommandReceived: func(ctx *MsgContext, msg *Message) {
 			luaInitStartTime := time.Now().UnixMicro()
 			if !ctx.Dice.CustomReplyConfigEnable {
 				return
