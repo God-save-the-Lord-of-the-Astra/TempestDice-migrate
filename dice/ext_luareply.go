@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -21,7 +22,11 @@ func LuaReplyLoad(d *Dice) {
 	defaultLuaReplyExist := false
 	var filename string
 	for _, file := range files {
-		filename = "/luareply.json"
+		if runtime.GOOS == "windows" {
+			filename = "\\luareply.json"
+		} else {
+			filename = "/luareply.json"
+		}
 		if file == d.GetExtDataDir("reply")+filename {
 			defaultLuaReplyExist = true
 		}
@@ -51,7 +56,7 @@ func RegisterBuiltinLuaReply(d *Dice) {
 		Author:     "海棠",
 		AutoActive: true,
 		Official:   true,
-		OnNotCommandReceived: func(ctx *MsgContext, msg *Message) {
+		OnMessageReceived: func(ctx *MsgContext, msg *Message) {
 			luaInitStartTime := time.Now().UnixMicro()
 			if !ctx.Dice.CustomReplyConfigEnable {
 				return
