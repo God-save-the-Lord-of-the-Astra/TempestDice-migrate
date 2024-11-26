@@ -1,6 +1,7 @@
 package dice
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -38,6 +39,39 @@ type payload struct {
 type data struct {
 	Payload []byte `msgpack:"payload,omitempty"`
 	Sign    []byte `msgpack:"sign,omitempty"`
+}
+
+type payloadPublicDice struct {
+	Version string `msgpack:"version,omitempty"`
+	Sign    []byte `msgpack:"sign,omitempty"`
+}
+
+func GenerateVerificationKeyForPublicDice(data any) string {
+	doEcdsaSign := len(SealTrustedClientPrivateKey) > 0
+	pp, _ := msgpack.Marshal(data)
+
+	var sign []byte
+	if doEcdsaSign {
+		var err error
+		sign, err = crypto.EcdsaSignRow(pp, SealTrustedClientPrivateKey)
+		if err != nil {
+			return ""
+		}
+	} else {
+		h := sha256.New()
+		h.Write(pp)
+		sign = h.Sum(nil)
+	}
+	d := payloadPublicDice{
+		Version: VERSION.String(),
+		Sign:    sign,
+	}
+
+	dp, _ := msgpack.Marshal(d)
+	if doEcdsaSign {
+		return fmt.Sprintf("SEAL#%s", base64.StdEncoding.EncodeToString(dp))
+	}
+	return fmt.Sprintf("SEAL~%s", base64.StdEncoding.EncodeToString(dp))
 }
 
 // GenerateVerificationCode 生成海豹校验码

@@ -17,6 +17,7 @@ import (
 	"github.com/dop251/goja_nodejs/require"
 	"github.com/go-creed/sat"
 	"github.com/jmoiron/sqlx"
+	"github.com/labstack/gommon/log"
 	wr "github.com/mroth/weightedrand"
 	"github.com/robfig/cron/v3"
 	ds "github.com/sealdice/dicescript"
@@ -30,6 +31,7 @@ import (
 	"tempestdice/dice/censor"
 	"tempestdice/dice/logger"
 	"tempestdice/dice/model"
+	"tempestdice/utils/public_dice"
 	"tempestdice/versioninfo"
 )
 
@@ -294,9 +296,14 @@ type Dice struct {
 
 	AttrsManager *AttrsManager `json:"-" yaml:"-"`
 
+	Config Config `json:"-" yaml:"-"`
+
 	AdvancedConfig AdvancedConfig `json:"-" yaml:"-"`
 
 	ContainerMode bool `yaml:"-" json:"-"` // 容器模式：禁用内置适配器，不允许使用内置Lagrange和旧的内置Gocq
+
+	PublicDice        *public_dice.PublicDiceClient `json:"-" yaml:"-"`
+	PublicDiceTimerId cron.EntryID                  `json:"-" yaml:"-"`
 }
 
 type CensorMode int
@@ -398,6 +405,8 @@ func (d *Dice) Init() {
 	if d.EnableCensor {
 		d.NewCensorManager()
 	}
+
+	go d.PublicDiceSetup()
 
 	// 创建js运行时
 	if d.JsEnable {
@@ -733,6 +742,99 @@ func (d *Dice) IsMaster(uid string) bool {
 		}
 	}
 	return false
+}
+
+func (d *Dice) PublicDiceEndpointRefresh() {
+	cfg := &d.Config.PublicDiceConfig
+
+	var endpointItems []*public_dice.Endpoint
+	for _, i := range d.ImSession.EndPoints {
+		if !i.IsPublic {
+			continue
+		}
+		endpointItems = append(endpointItems, &public_dice.Endpoint{
+			Platform: i.Platform,
+			UID:      i.UserID,
+			IsOnline: i.State == 1,
+		})
+	}
+
+	_, code := d.PublicDice.EndpointUpdate(&public_dice.EndpointUpdateRequest{
+		DiceID:    cfg.ID,
+		Endpoints: endpointItems,
+	}, GenerateVerificationKeyForPublicDice)
+	if code != 200 {
+		log.Warn("[公骰]无法通过服务器校验，不再进行更新")
+		return
+	}
+}
+
+func (d *Dice) PublicDiceInfoRegister() {
+	cfg := &d.Config.PublicDiceConfig
+
+	pd, code := d.PublicDice.Register(&public_dice.RegisterRequest{
+		ID:    cfg.ID,
+		Name:  cfg.Name,
+		Brief: cfg.Brief,
+		Note:  cfg.Note,
+	}, GenerateVerificationKeyForPublicDice)
+	if code != 200 {
+		log.Warn("[公骰]无法通过服务器校验，不再进行骰号注册")
+		return
+	}
+	// 两种可能: 1. 原本ID为空 2. ID 无效，这里会自动变成新的
+	if pd.Item.ID != "" && cfg.ID != pd.Item.ID {
+		cfg.ID = pd.Item.ID
+	}
+}
+
+func (d *Dice) PublicDiceSetupTick() {
+	cfg := &d.Config.PublicDiceConfig
+
+	doTickUpdate := func() {
+		if !cfg.Enable {
+			d.Cron.Remove(d.PublicDiceTimerId)
+			return
+		}
+		var tickEndpointItems []*public_dice.TickEndpoint
+		for _, i := range d.ImSession.EndPoints {
+			if !i.IsPublic {
+				continue
+			}
+			tickEndpointItems = append(tickEndpointItems, &public_dice.TickEndpoint{
+				UID:      i.UserID,
+				IsOnline: i.State == 1,
+			})
+		}
+		d.PublicDice.TickUpdate(&public_dice.TickUpdateRequest{
+			ID:        cfg.ID,
+			Endpoints: tickEndpointItems,
+		}, GenerateVerificationKeyForPublicDice)
+	}
+
+	if d.PublicDiceTimerId != 0 {
+		d.Cron.Remove(d.PublicDiceTimerId)
+	}
+
+	go func() {
+		// 20s后进行第一次调用，此后3min进行一次更新
+		time.Sleep(20 * time.Second)
+		doTickUpdate()
+	}()
+
+	d.PublicDiceTimerId, _ = d.Cron.AddFunc("@every 3m", doTickUpdate)
+}
+
+func (d *Dice) PublicDiceSetup() {
+	d.PublicDice = public_dice.NewClient("https://dice.weizaima.com", "")
+
+	cfg := &d.Config.PublicDiceConfig
+	if !cfg.Enable {
+		return
+	}
+	d.PublicDiceInfoRegister()
+	d.PublicDiceEndpointRefresh()
+	d.PublicDiceSetupTick()
 }
 
 // ApplyAliveNotice 存活消息(骰狗)
